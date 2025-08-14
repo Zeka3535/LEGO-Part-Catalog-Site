@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -116,6 +117,7 @@
 
   <!-- Settings Modal -->
   <div id="settings-modal-container" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 backdrop-blur-sm modal-hidden"></div>
+  <input type="file" id="import-csv-input" class="hidden" accept=".csv">
 
   <!-- Scroll to Top Button -->
   <button id="scroll-to-top-btn" class="fixed bottom-6 right-6 bg-blue-600 text-white p-3 rounded-full shadow-lg hover:bg-blue-700 transition-all duration-300 opacity-0 pointer-events-none z-50 transform translate-y-4" aria-label="Вернуться наверх">
@@ -249,6 +251,8 @@
       isSettingsModalOpen: false,
       settingsModal: {
           confirmingDelete: null, // null, 'parts', 'sets', 'minifigs'
+          statusMessage: '',
+          statusType: 'info' // 'info', 'success', 'error'
       },
       // Other state
       itemsToDisplay: 48,
@@ -904,17 +908,17 @@
 
         console.log(`Fetching details for ${missingSetNums.length} sets from collection...`);
         
-        for (const setNum of missingSetNums) {
+        const BATCH_SIZE = 100;
+        for (let i = 0; i < missingSetNums.length; i += BATCH_SIZE) {
+            const batch = missingSetNums.slice(i, i + BATCH_SIZE);
             try {
-                const response = await fetch(`${REBRICKABLE_API_URL}/sets/${setNum}/`, {
-                    headers: { 'Authorization': `key ${getApiKey()}` }
+                const rawSets = await apiFetchPaginated(`/sets/?set_nums=${batch.join(',')}`);
+                (rawSets || []).forEach(set => {
+                    SET_MAP[set.set_num] = set;
                 });
-                if (!response.ok) throw new Error(`Set ${setNum} not found.`);
-                const set = await response.json();
-                SET_MAP[set.set_num] = set;
-                await new Promise(resolve => setTimeout(resolve, 200)); // Small delay between fetches
             } catch(err) {
-                console.error(`Could not fetch details for set ${setNum}:`, err);
+                console.error(`Could not fetch details for batch of sets starting with ${batch[0]}:`, err);
+                state.apiError = (state.apiError ? state.apiError + '\n' : '') + 'Не удалось загрузить данные для некоторых наборов коллекции.';
             }
         }
     }
@@ -1037,7 +1041,7 @@
             
             if (!data.next) break;
             page++;
-            await new Promise(resolve => setTimeout(resolve, 1100)); // Prevent API rate limiting
+            await new Promise(resolve => setTimeout(resolve, 1000)); // Prevent API rate limiting
         }
         return allResults;
     }
@@ -1191,6 +1195,33 @@
             return 'цвета';
         }
         return 'цветов';
+    }
+
+    function parseCsvLine(line) {
+        const results = [];
+        let current = '';
+        let inQuotes = false;
+        const quoteChar = '"';
+
+        for (let i = 0; i < line.length; i++) {
+            const char = line[i];
+            
+            if (char === quoteChar) {
+                if (inQuotes && line[i+1] === quoteChar) {
+                    current += quoteChar;
+                    i++;
+                } else {
+                    inQuotes = !inQuotes;
+                }
+            } else if (char === ',' && !inQuotes) {
+                results.push(current);
+                current = '';
+            } else {
+                current += char;
+            }
+        }
+        results.push(current);
+        return results.map(r => r.trim());
     }
 
     // --- RENDER FUNCTIONS ---
@@ -1842,7 +1873,7 @@
                 switch(state.sortBy) {
                     case 'name_asc': collectionItems.sort((a, b) => a.name.localeCompare(b.name)); break;
                     case 'name_desc': collectionItems.sort((a, b) => b.name.localeCompare(a.name)); break;
-                    case 'num_parts_desc': collectionItems.sort((a, b) => b.num_parts - a.num_parts); break;
+                    case 'num_parts_desc': collectionItems.sort((a, b) => b.num_parts - b.num_parts); break;
                     case 'num_parts_asc': collectionItems.sort((a, b) => a.num_parts - b.num_parts); break;
                 }
                 renderFn = (item, anim, i) => renderMinifigCard(item, anim, i);
@@ -2523,7 +2554,7 @@
         settingsModalContainer.classList.remove('modal-hidden');
         requestAnimationFrame(() => settingsModalContainer.classList.add('visible'));
 
-        const { confirmingDelete } = state.settingsModal;
+        const { confirmingDelete, statusMessage, statusType } = state.settingsModal;
         const totalPartsCount = Object.values(state.collection).reduce((sum, colors) => sum + Object.keys(colors).length, 0);
         const totalSetsCount = Object.keys(state.setCollection).length;
         const totalMinifigsCount = Object.keys(state.minifigCollection).length;
@@ -2564,6 +2595,7 @@
             deleteMinifigsSection = `<button data-action="delete-all-minifigs" class="w-full flex items-center justify-center px-3 py-2 text-sm font-semibold rounded-md transition-colors duration-150 bg-red-600 hover:bg-red-700 text-white ${totalMinifigsCount === 0 ? 'opacity-50 cursor-not-allowed' : ''}" ${totalMinifigsCount === 0 ? 'disabled' : ''}>${TrashIcon('w-5 h-5 mr-2')} Удалить все минифигурки</button>`;
         }
 
+        const statusColorClass = statusType === 'error' ? 'bg-red-900/50 text-red-300' : (statusType === 'success' ? 'bg-green-900/50 text-green-300' : 'bg-blue-900/50 text-blue-300');
 
         settingsModalContainer.innerHTML = `
              <div id="settings-modal-content" class="bg-gray-800 rounded-lg shadow-xl w-[calc(100%-2rem)] max-w-md flex flex-col max-h-[calc(100vh-2rem)] ${animationClass}">
@@ -2572,6 +2604,21 @@
                      <button id="settings-modal-close" class="text-gray-400 hover:text-white transition-colors">${XIcon('w-6 h-6')}</button>
                 </div>
                 <div class="flex-grow p-4 overflow-y-auto no-scrollbar space-y-6">
+                     <div>
+                        <h3 class="text-md font-semibold text-gray-300 mb-2">Импорт / Экспорт</h3>
+                         ${statusMessage ? `<div id="import-export-status" class="mb-2 p-2 text-sm rounded-md ${statusColorClass}">${statusMessage}</div>` : '<div id="import-export-status" class="mb-2"></div>'}
+                        <div class="bg-gray-900/50 rounded-lg p-3 space-y-3">
+                            <p class="text-xs text-gray-400">Сохраните вашу коллекцию в CSV файл или загрузите ее из ранее сохраненного файла. Импорт объединит данные с вашей текущей коллекцией.</p>
+                            <div class="flex gap-3">
+                                <button data-action="import-csv" class="w-full flex items-center justify-center px-3 py-2 text-sm font-semibold rounded-md transition-colors duration-150 bg-blue-600 hover:bg-blue-700 text-white">
+                                    ${UploadIcon('w-5 h-5 mr-2')} Импорт из CSV
+                                </button>
+                                <button data-action="export-csv" class="w-full flex items-center justify-center px-3 py-2 text-sm font-semibold rounded-md transition-colors duration-150 bg-green-600 hover:bg-green-700 text-white">
+                                    ${DownloadIcon('w-5 h-5 mr-2')} Экспорт в CSV
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                      <div>
                         <h3 class="text-md font-semibold text-gray-300 mb-2">Опасная зона</h3>
                         <div class="bg-red-900/20 border border-red-500/30 rounded-lg p-3 space-y-3">
@@ -2776,6 +2823,149 @@
             sidebarBackdrop.classList.add('hidden');
             document.body.style.overflow = '';
         }
+    }
+
+    // --- CSV Handling ---
+    function exportCollectionToCSV() {
+        const headers = 'type,id,color_id,quantity,name,color_name';
+        let csvContent = headers + '\n';
+        
+        const escapeCsvField = (field) => {
+            if (field === null || field === undefined) return '';
+            const stringField = String(field);
+            if (stringField.includes(',') || stringField.includes('"') || stringField.includes('\n')) {
+                return `"${stringField.replace(/"/g, '""')}"`;
+            }
+            return stringField;
+        };
+
+        // Parts
+        for (const partId in state.collection) {
+            for (const colorId in state.collection[partId]) {
+                const quantity = state.collection[partId][colorId];
+                const partName = PART_MAP[partId]?.name || '';
+                const colorName = COLOR_MAP[colorId]?.name || '';
+                csvContent += `part,${escapeCsvField(partId)},${escapeCsvField(colorId)},${quantity},${escapeCsvField(partName)},${escapeCsvField(colorName)}\n`;
+            }
+        }
+
+        // Sets
+        for (const setNum in state.setCollection) {
+            const quantity = state.setCollection[setNum].quantity;
+            const setName = SET_MAP[setNum]?.name || '';
+            csvContent += `set,${escapeCsvField(setNum)},,${quantity},${escapeCsvField(setName)},\n`;
+        }
+        
+        // Minifigs
+        for (const figNum in state.minifigCollection) {
+            const quantity = state.minifigCollection[figNum].quantity;
+            const figName = MINIFIG_MAP[figNum]?.name || '';
+            csvContent += `minifig,${escapeCsvField(figNum)},,${quantity},${escapeCsvField(figName)},\n`;
+        }
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        const url = URL.createObjectURL(blob);
+        link.setAttribute("href", url);
+        const date = new Date().toISOString().slice(0, 10);
+        link.setAttribute("download", `lego-collection-${date}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    }
+
+    async function importCollectionFromCSV(file) {
+        state.settingsModal.statusMessage = 'Импорт файла...';
+        state.settingsModal.statusType = 'info';
+        renderSettingsModal();
+
+        const showStatus = (message, type) => {
+             state.settingsModal.statusMessage = message;
+             state.settingsModal.statusType = type;
+             renderSettingsModal();
+        };
+    
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            try {
+                const text = e.target.result;
+                const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
+                if (lines.length < 2) throw new Error("CSV файл пуст или содержит только заголовки.");
+
+                const headers = parseCsvLine(lines[0]).map(h => h.trim().replace(/"/g, ''));
+                const requiredHeaders = ['type', 'id', 'quantity'];
+                if (!requiredHeaders.every(h => headers.includes(h))) {
+                    throw new Error(`Неверные заголовки в CSV. Обязательные: ${requiredHeaders.join(', ')}.`);
+                }
+                
+                let addedCount = { parts: 0, sets: 0, minifigs: 0 };
+                const originalCollection = JSON.parse(JSON.stringify(state.collection));
+                const originalSetCollection = JSON.parse(JSON.stringify(state.setCollection));
+                const originalMinifigCollection = JSON.parse(JSON.stringify(state.minifigCollection));
+
+                for (let i = 1; i < lines.length; i++) {
+                    const values = parseCsvLine(lines[i]);
+                    const row = headers.reduce((obj, header, index) => {
+                        obj[header] = values[index] ? values[index].trim() : '';
+                        return obj;
+                    }, {});
+
+                    const { type, id, color_id, quantity } = row;
+                    const qty = parseInt(quantity, 10);
+
+                    if (!type || !id || isNaN(qty) || qty <= 0) {
+                        console.warn(`Пропуск некорректной строки ${i + 1}:`, lines[i]);
+                        continue;
+                    }
+
+                    switch (type) {
+                        case 'part':
+                            if (!color_id) continue;
+                            if (!state.collection[id]) state.collection[id] = {};
+                            const currentPartQty = state.collection[id][color_id] || 0;
+                            state.collection[id][color_id] = currentPartQty + qty;
+                            addedCount.parts++;
+                            break;
+                        case 'set':
+                            const currentSetQty = state.setCollection[id]?.quantity || 0;
+                            state.setCollection[id] = { quantity: currentSetQty + qty };
+                            addedCount.sets++;
+                            break;
+                        case 'minifig':
+                            const currentMinifigQty = state.minifigCollection[id]?.quantity || 0;
+                            state.minifigCollection[id] = { quantity: currentMinifigQty + qty };
+                            addedCount.minifigs++;
+                            break;
+                    }
+                }
+
+                saveState();
+                
+                showStatus('Загрузка данных для импортированных предметов...', 'info');
+                
+                await Promise.all([
+                    fetchMissingCollectionPartDetails(),
+                    fetchMissingCollectionSetDetails(),
+                    fetchMissingCollectionMinifigDetails()
+                ]);
+                await fetchColorDetailsForCollectionParts();
+
+                showStatus(`Импорт завершен. Добавлено: ${addedCount.parts} деталей, ${addedCount.sets} наборов, ${addedCount.minifigs} минифигурок.`, 'success');
+                
+                state.isGridStale = true;
+                updateUI();
+
+            } catch (error) {
+                console.error("CSV Import failed:", error);
+                showStatus(`Ошибка импорта: ${error.message}`, 'error');
+            }
+        };
+        reader.onerror = () => {
+            showStatus('Не удалось прочитать файл.', 'error');
+        };
+        reader.readAsText(file);
     }
 
     // --- EVENT HANDLING ---
@@ -3218,6 +3408,7 @@
                 settingsModalContainer.classList.add('modal-hidden');
                 settingsModalContainer.innerHTML = '';
                 state.settingsModal.confirmingDelete = null;
+                state.settingsModal.statusMessage = '';
             }
         }, { once: true });
     }
@@ -3679,6 +3870,12 @@
                     renderSettingsModal();
                     updateUI();
                     break;
+                case 'export-csv':
+                    exportCollectionToCSV();
+                    break;
+                case 'import-csv':
+                    document.getElementById('import-csv-input')?.click();
+                    break;
             }
             return;
         }
@@ -3903,25 +4100,32 @@
     
     document.addEventListener('change', (e) => {
         if (!(e.target instanceof Element)) return;
+        const target = e.target;
         
-        if(e.target.id === 'search-input') {
-            state.searchQuery = e.target.value;
+        if(target.id === 'search-input') {
+            state.searchQuery = target.value;
             if (state.searchQuery.trim() === '') {
                  triggerSearch();
             }
             renderHeader(); // to show/hide clear button
         }
         
-        if (modalContainer && modalContainer.contains(e.target) && e.target.id === 'variation-select') {
-            const newPartId = e.target.value;
+        if (target.id === 'import-csv-input') {
+            const file = target.files?.[0];
+            if (file) {
+                importCollectionFromCSV(file);
+            }
+            target.value = ''; // Reset input so user can select the same file again
+        }
+
+        if (modalContainer && modalContainer.contains(target) && target.id === 'variation-select') {
+            const newPartId = target.value;
             if (newPartId && newPartId !== state.selectedPartId) {
                 openModalForPart(newPartId, state.modal.partGroupId, state.modal.partVariations);
             }
         }
 
-        if (filterModalContainer && filterModalContainer.contains(e.target)) {
-            const target = e.target;
-            
+        if (filterModalContainer && filterModalContainer.contains(target)) {
             if (target.matches('input[name="sort"]')) {
                 tempFilters.sortBy = target.value;
             }
