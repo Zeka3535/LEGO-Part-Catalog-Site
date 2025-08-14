@@ -929,7 +929,7 @@
 
         console.log(`Fetching details for ${missingSetNums.length} sets from collection...`);
         
-        const BATCH_SIZE = 100;
+        const BATCH_SIZE = 50;
         for (let i = 0; i < missingSetNums.length; i += BATCH_SIZE) {
             const batch = missingSetNums.slice(i, i + BATCH_SIZE);
             try {
@@ -945,7 +945,7 @@
     }
 
     async function fetchMinifigDetails(figNum) {
-        if (MINIFIG_MAP[figNum]) return;
+        if (MINIFIG_MAP[figNum] && MINIFIG_MAP[figNum].name) return;
         try {
             const response = await fetch(`${REBRICKABLE_API_URL}/minifigs/${figNum}/`, {
                 headers: { 'Authorization': `key ${getApiKey()}` }
@@ -967,7 +967,8 @@
         
         for (const figNum of missingFigNums) {
             await fetchMinifigDetails(figNum);
-            await new Promise(resolve => setTimeout(resolve, 200));
+            // Add a small delay to avoid hitting API rate limits if any
+            await new Promise(resolve => setTimeout(resolve, 100)); 
         }
     }
 
@@ -1073,8 +1074,12 @@
 
         try {
             const minifigs = await apiFetchPaginated(`/sets/${setNum}/minifigs/`);
+            const minifigDetailsPromises = minifigs.map(mf => fetchMinifigDetails(mf.set_num));
+            await Promise.all(minifigDetailsPromises);
+
             state.setModal.minifigs = (minifigs || []).map(mf => ({
-                ...mf,
+                ...MINIFIG_MAP[mf.set_num], // Use the full detail from the map
+                quantity: mf.quantity, // Keep the quantity from this specific set
                 isExpanded: false,
                 isLoadingParts: false,
                 parts: null, // Use null to indicate not fetched yet
@@ -1297,12 +1302,17 @@
       
       const subViewButtonStyle = (subView) => `relative flex-1 py-2 px-1 rounded-lg text-sm font-semibold transition-colors duration-200 flex flex-col items-center justify-center gap-1 ${state.activeSubView === subView ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white'}`;
 
-      const badge = (subView, count) => {
+      const badge = (subView, count, uniqueCount) => {
             if (count === 0 || state.currentView !== 'collection') return '';
-            const style = `absolute top-1 right-1 text-xs px-1.5 py-0.5 rounded-full font-bold ${state.activeSubView === subView ? 'bg-blue-200 text-blue-800' : 'bg-gray-600 text-gray-200'}`;
-            return `<span class="${style}">${count}</span>`;
-      };
+            
+            let displayCount = uniqueCount;
+            if(subView === 'parts') {
+                displayCount = count; // Show total for parts
+            }
 
+            const style = `absolute top-1 right-1 text-xs px-1.5 py-0.5 rounded-full font-bold ${state.activeSubView === subView ? 'bg-blue-200 text-blue-800' : 'bg-gray-600 text-gray-200'}`;
+            return `<span class="${style}">${displayCount}</span>`;
+      };
 
       let mainListContent = '';
       let mainListTitle = '';
@@ -1499,17 +1509,17 @@
             <button data-sub-view="parts" class="${subViewButtonStyle('parts')}">
                 ${BrickIcon('w-5 h-5')}
                 <span class="mt-1">Детали</span>
-                ${badge('parts', totalPartsCount)}
+                ${badge('parts', totalPartsCount, uniqueModelsCount)}
             </button>
             <button data-sub-view="sets" class="${subViewButtonStyle('sets')}">
                 ${SetsIcon('w-5 h-5')}
                 <span class="mt-1">Наборы</span>
-                ${badge('sets', totalSetsCount)}
+                ${badge('sets', totalSetsCount, uniqueSetsCount)}
             </button>
             <button data-sub-view="minifigs" class="${subViewButtonStyle('minifigs')}">
                 ${MinifigIcon('w-5 h-5')}
                 <span class="mt-1">Фигурки</span>
-                ${badge('minifigs', totalMinifigsCount)}
+                ${badge('minifigs', totalMinifigsCount, uniqueMinifigsCount)}
             </button>
         </div>
         
@@ -1801,7 +1811,7 @@
             } else { // minifigs
                 itemsToDisplay = state.searchQuery ? state.searchMinifigResults : state.minifigResults;
                 renderFn = (item) => renderMinifigCard(item, state.isGridStale);
-                emptyMessage = state.searchQuery ? 'По вашему запросу ничего не найдено.' : 'В каталоге нет минифигурок. Попробуйте поиск.';
+                emptyMessage = state.searchQuery ? 'По вашему запросу ничего не найдено.' : (state.currentView === 'catalog' && !state.searchQuery ? 'Используйте поиск для нахождения минифигурок.' : 'В коллекции нет минифигурок.');
             }
 
             if (!itemsToDisplay || itemsToDisplay.length === 0) {
@@ -1894,7 +1904,7 @@
                 switch(state.sortBy) {
                     case 'name_asc': collectionItems.sort((a, b) => a.name.localeCompare(b.name)); break;
                     case 'name_desc': collectionItems.sort((a, b) => b.name.localeCompare(a.name)); break;
-                    case 'num_parts_desc': collectionItems.sort((a, b) => b.num_parts - b.num_parts); break;
+                    case 'num_parts_desc': collectionItems.sort((a, b) => b.num_parts - a.num_parts); break;
                     case 'num_parts_asc': collectionItems.sort((a, b) => a.num_parts - b.num_parts); break;
                 }
                 renderFn = (item, anim, i) => renderMinifigCard(item, anim, i);
@@ -2126,17 +2136,18 @@
             minifigsContent = minifigs.map(mf => {
                 const figNum = mf.set_num;
                 const collectionQty = state.minifigCollection[figNum]?.quantity || 0;
+                const figName = mf.name || 'Загрузка...';
                 return `
                     <div class="bg-gray-700/50 rounded-lg overflow-hidden">
                         <div class="flex items-center p-2 gap-3 text-sm">
                             <div data-action="view-image-fullscreen" data-image-url="${mf.set_img_url || ''}" class="w-12 h-12 bg-white rounded-md flex items-center justify-center flex-shrink-0 cursor-pointer group relative">
-                                <img ${getPartImageUrl(mf.set_img_url)} alt="${mf.set_name}" class="w-full h-full object-contain p-1">
+                                <img ${getPartImageUrl(mf.set_img_url)} alt="${figName}" class="w-full h-full object-contain p-1">
                                 <div class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                                     ${SearchIcon('w-5 h-5 text-white')}
                                 </div>
                             </div>
                             <div class="flex-grow truncate">
-                                <p class="text-white font-semibold truncate">${mf.set_name}</p>
+                                <p class="text-white font-semibold truncate">${figName}</p>
                                 <p class="text-gray-400 truncate">${figNum}</p>
                             </div>
                             <div class="flex items-center gap-2 flex-shrink-0">
@@ -3097,10 +3108,10 @@
         }
     }
     
-    async function handleUpdateMinifigCollection(figNum, quantity) {
+    async function handleUpdateMinifigCollection(figNum, quantity, shouldFetchDetails = true) {
         if (quantity > 0) {
             state.minifigCollection[figNum] = { quantity };
-            if (!MINIFIG_MAP[figNum]) {
+            if (shouldFetchDetails && (!MINIFIG_MAP[figNum] || !MINIFIG_MAP[figNum].name)) {
                 await fetchMinifigDetails(figNum);
             }
         } else {
@@ -3134,7 +3145,10 @@
             renderMinifigModal(false);
         }
         if (state.selectedSetNum) {
-            renderSetModal(false); // Re-render the set modal to update button states.
+            const minifigInSetModal = state.setModal.minifigs.find(mf => mf.set_num === figNum);
+            if (minifigInSetModal) {
+                 renderSetModal(false); // Re-render the set modal to update button states.
+            }
         }
     }
 
@@ -3173,53 +3187,71 @@
                 }
             });
 
-            // 2. Process minifigs and their parts, ONLY for the 'add' action
+            // 2. Process minifigs and their parts
             let minifigsAddedCount = 0;
             let minifigPartsAddedCount = 0;
+            let minifigsRemovedCount = 0;
+            let minifigPartsRemovedCount = 0;
 
-            if (action === 'add') {
-                const minifigsInSet = state.setModal.minifigs || [];
-                // Use Promise.all to fetch parts for all minifigs concurrently if they haven't been fetched yet
-                await Promise.all(minifigsInSet.map(async (minifig) => {
-                    const figNum = minifig.set_num;
-                    const quantityInSet = minifig.quantity;
+            const minifigsInSet = state.setModal.minifigs || (await apiFetchPaginated(`/sets/${setNum}/minifigs/`));
+            
+            await Promise.all(minifigsInSet.map(async (minifig) => {
+                const figNum = minifig.set_num;
+                const quantityInSet = minifig.quantity;
 
-                    // Add minifig to minifig collection
-                    const currentMinifigQty = state.minifigCollection[figNum]?.quantity || 0;
+                // Update minifig collection
+                const currentMinifigQty = state.minifigCollection[figNum]?.quantity || 0;
+                if (action === 'add') {
                     state.minifigCollection[figNum] = { quantity: currentMinifigQty + quantityInSet };
                     minifigsAddedCount += quantityInSet;
-
-                    // Add the minifig's own parts to the main parts collection
-                    if (!minifig.parts) {
-                        minifig.parts = await fetchMinifigParts(figNum);
+                } else {
+                    const newMinifigQty = currentMinifigQty - quantityInSet;
+                    if(newMinifigQty > 0) {
+                        state.minifigCollection[figNum] = { quantity: newMinifigQty };
+                    } else {
+                        delete state.minifigCollection[figNum];
                     }
-                    
-                    (minifig.parts || []).forEach(partItem => {
-                        const partId = partItem.part.part_num;
-                        const colorId = String(partItem.color.id);
-                        const quantityInMinifig = partItem.quantity;
-                        const totalQuantityToAdd = quantityInMinifig * quantityInSet;
+                    minifigsRemovedCount += quantityInSet;
+                }
+                
+                // Update parts from minifigs
+                const minifigParts = minifig.parts || await fetchMinifigParts(figNum);
+                minifig.parts = minifigParts; // cache for later
+                
+                (minifigParts || []).forEach(partItem => {
+                    const partId = partItem.part.part_num;
+                    const colorId = String(partItem.color.id);
+                    const quantityInMinifig = partItem.quantity;
+                    const totalQuantityToChange = quantityInMinifig * quantityInSet;
 
-                        if (!state.collection[partId]) state.collection[partId] = {};
-                        const currentPartQty = state.collection[partId][colorId] || 0;
-                        state.collection[partId][colorId] = currentPartQty + totalQuantityToAdd;
-                        minifigPartsAddedCount += totalQuantityToAdd;
-                    });
-                }));
-            }
+                    if (!state.collection[partId]) state.collection[partId] = {};
+                    const currentPartQty = state.collection[partId][colorId] || 0;
+                    
+                    if (action === 'add') {
+                         state.collection[partId][colorId] = currentPartQty + totalQuantityToChange;
+                         minifigPartsAddedCount += totalQuantityToChange;
+                    } else {
+                        const newPartQty = currentPartQty - totalQuantityToChange;
+                        if (newPartQty > 0) {
+                            state.collection[partId][colorId] = newPartQty;
+                        } else {
+                            delete state.collection[partId][colorId];
+                            if (Object.keys(state.collection[partId]).length === 0) delete state.collection[partId];
+                        }
+                        minifigPartsRemovedCount += totalQuantityToChange;
+                    }
+                });
+            }));
             
             // 3. Save the updated state to localStorage
             saveState();
             
             // 4. Fetch any missing details for newly added items
-            const promises = [
+            await Promise.all([
                 fetchMissingCollectionPartDetails(),
                 fetchColorDetailsForCollectionParts(),
-            ];
-            if (action === 'add') {
-                promises.push(fetchMissingCollectionMinifigDetails());
-            }
-            await Promise.all(promises);
+                fetchMissingCollectionMinifigDetails()
+            ]);
             
             // 5. Set the appropriate status message
             if (action === 'add') {
@@ -3229,7 +3261,11 @@
                 }
                 state.setModal.statusMessage = messageParts.join(' ');
             } else {
-                state.setModal.statusMessage = `Детали успешно удалены.`;
+                let messageParts = [`Детали набора успешно удалены.`];
+                if (minifigsRemovedCount > 0) {
+                    messageParts.push(`Также удалены ${minifigsRemovedCount} минифигурок и их детали (${minifigPartsRemovedCount} шт.).`);
+                }
+                state.setModal.statusMessage = messageParts.join(' ');
             }
             
             state.setModal.statusType = 'success';
@@ -3254,7 +3290,7 @@
         if (!minifig || state.setModal.isBulkUpdating) return;
 
         state.setModal.isBulkUpdating = true;
-        state.setModal.statusMessage = `Добавление деталей из "${minifig.set_name}"...`;
+        state.setModal.statusMessage = `Добавление деталей из "${minifig.name}"...`;
         state.setModal.statusType = 'info';
         renderSetModal(false);
 
@@ -3561,7 +3597,11 @@
                     updateUI();
                 }
             } else if (state.activeSubView === 'minifigs') {
-                fetchMinifigs();
+                if (state.searchQuery || !state.minifigResults) {
+                   fetchMinifigs();
+                } else {
+                   updateUI();
+                }
             } else { // parts
                 if (state.searchQuery) {
                     searchRebrickableParts(state.searchQuery.trim());
@@ -3660,7 +3700,7 @@
             state.selectedThemeId = null;
             state.selectedSetCollectionThemeId = null;
 
-            if (state.currentView === 'catalog' && state.activeSubView === 'minifigs') {
+            if (state.currentView === 'catalog' && state.activeSubView === 'minifigs' && !state.minifigResults) {
                 fetchMinifigs();
             } else {
                 updateUI();
@@ -3702,7 +3742,7 @@
             else if (newSubView === 'minifigs') state.sortBy = 'name_asc';
             else state.sortBy = 'popularity';
 
-            if (state.currentView === 'catalog' && newSubView === 'minifigs') {
+            if (state.currentView === 'catalog' && newSubView === 'minifigs' && !state.minifigResults) {
                 fetchMinifigs();
             } else {
                 updateUI();
@@ -4054,7 +4094,7 @@
                 case 'add-minifig-to-collection':
                     if (figNum && quantity) {
                         const currentQty = state.minifigCollection[figNum]?.quantity || 0;
-                        await handleUpdateMinifigCollection(figNum, currentQty + parseInt(quantity, 10));
+                        await handleUpdateMinifigCollection(figNum, currentQty + parseInt(quantity, 10), false);
                     }
                     break;
                 case 'add-minifig-parts-to-collection':
@@ -4247,11 +4287,18 @@
                 fetchThemes(),
             ]);
             
-            await Promise.all([
+            const collectionPromises = [
                 fetchMissingCollectionPartDetails(),
                 fetchMissingCollectionSetDetails(),
                 fetchMissingCollectionMinifigDetails()
-            ]);
+            ];
+
+            // Initial catalog load for minifigs if on that view
+            if(state.currentView === 'catalog' && state.activeSubView === 'minifigs') {
+                collectionPromises.push(fetchMinifigs());
+            }
+
+            await Promise.all(collectionPromises);
 
             await fetchColorDetailsForCollectionParts();
             
