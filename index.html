@@ -130,7 +130,7 @@
   <input type="file" id="import-csv-input" class="hidden" accept=".csv">
 
   <!-- Image Viewer Modal -->
-  <div id="image-viewer-container" class="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-60 backdrop-blur-sm viewer-hidden">
+  <div id="image-viewer-container" class="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-[100] backdrop-blur-sm viewer-hidden">
     <img id="fullscreen-image" src="" alt="Полноэкранный просмотр" class="max-w-[90vw] max-h-[90vh] object-contain shadow-2xl rounded-lg">
     <button id="image-viewer-close" class="absolute top-4 right-4 text-white text-opacity-80 hover:text-opacity-100 p-2 rounded-full transition-opacity bg-black/30 hover:bg-black/50">
         <!-- XIcon SVG will be inserted here by JS -->
@@ -138,7 +138,7 @@
   </div>
 
   <!-- Scroll to Top Button -->
-  <button id="scroll-to-top-btn" class="fixed bottom-6 right-6 bg-blue-600 text-white p-3 rounded-full shadow-lg hover:bg-blue-700 transition-all duration-300 opacity-0 pointer-events-none z-50 transform translate-y-4" aria-label="Вернуться наверх">
+  <button id="scroll-to-top-btn" class="fixed bottom-6 right-6 bg-blue-600 text-white p-3 rounded-full shadow-lg hover:bg-blue-700 transition-all duration-300 opacity-0 pointer-events-none z-40 transform translate-y-4" aria-label="Вернуться наверх">
     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
       <path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7"></path>
     </svg>
@@ -2666,6 +2666,17 @@
                            ${deletePartsSection}
                            ${deleteSetsSection}
                            ${deleteMinifigsSection}
+                        </div>
+                    </div>
+                    <div>
+                        <h3 class="text-md font-semibold text-gray-300 mb-2">О приложении</h3>
+                        <div class="bg-gray-900/50 rounded-lg p-3 space-y-3 text-sm text-gray-400">
+                           <p>
+                               <strong>Избранное:</strong> Чтобы добавить категорию или тему в избранное для быстрого доступа, наведите на нее курсор в боковом меню и нажмите на появившееся сердечко. Избранные элементы всегда будут отображаться вверху своих списков.
+                           </p>
+                           <p class="pt-3 border-t border-gray-700/50">
+                               Этот сайт использует <a href="https://rebrickable.com/api/" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:underline">Rebrickable API</a>, но не поддерживается и не утверждается Rebrickable.
+                           </p>
                         </div>
                     </div>
                 </div>
