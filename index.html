@@ -1246,7 +1246,7 @@
       const subViewButtonStyle = (subView) => `relative flex-1 py-2 px-1 rounded-lg text-sm font-semibold transition-colors duration-200 flex flex-col items-center justify-center gap-1 ${state.activeSubView === subView ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white'}`;
 
       const badge = (subView, count) => {
-            if (count === 0) return '';
+            if (count === 0 || state.currentView !== 'collection') return '';
             const style = `absolute top-1 right-1 text-xs px-1.5 py-0.5 rounded-full font-bold ${state.activeSubView === subView ? 'bg-blue-200 text-blue-800' : 'bg-gray-600 text-gray-200'}`;
             return `<span class="${style}">${count}</span>`;
       };
@@ -1447,17 +1447,17 @@
             <button data-sub-view="parts" class="${subViewButtonStyle('parts')}">
                 ${BrickIcon('w-5 h-5')}
                 <span class="mt-1">Детали</span>
-                ${badge('parts', state.currentView === 'collection' ? totalPartsCount : 0)}
+                ${badge('parts', totalPartsCount)}
             </button>
             <button data-sub-view="sets" class="${subViewButtonStyle('sets')}">
                 ${SetsIcon('w-5 h-5')}
                 <span class="mt-1">Наборы</span>
-                ${badge('sets', state.currentView === 'collection' ? totalSetsCount : 0)}
+                ${badge('sets', totalSetsCount)}
             </button>
             <button data-sub-view="minifigs" class="${subViewButtonStyle('minifigs')}">
                 ${MinifigIcon('w-5 h-5')}
                 <span class="mt-1">Фигурки</span>
-                ${badge('minifigs', state.currentView === 'collection' ? totalMinifigsCount : 0)}
+                ${badge('minifigs', totalMinifigsCount)}
             </button>
         </div>
         
@@ -2920,8 +2920,8 @@
         updateSetModalControlsState();
 
         try {
+            // 1. Process regular parts from the set inventory
             const inventory = await fetchAllSetInventory(setNum);
-
             (inventory || []).forEach(item => {
                 const { part, color, quantity } = item;
                 if (!state.collection[part.part_num]) {
@@ -2933,7 +2933,7 @@
                 
                 if (action === 'add') {
                     state.collection[part.part_num][currentColorId] = currentQuantity + quantity;
-                } else { // remove
+                } else { // remove action
                     const newQuantity = currentQuantity - quantity;
                     if (newQuantity > 0) {
                         state.collection[part.part_num][currentColorId] = newQuantity;
@@ -2945,16 +2945,69 @@
                     }
                 }
             });
+
+            // 2. Process minifigs and their parts, ONLY for the 'add' action
+            let minifigsAddedCount = 0;
+            let minifigPartsAddedCount = 0;
+
+            if (action === 'add') {
+                const minifigsInSet = state.setModal.minifigs || [];
+                // Use Promise.all to fetch parts for all minifigs concurrently if they haven't been fetched yet
+                await Promise.all(minifigsInSet.map(async (minifig) => {
+                    const figNum = minifig.set_num;
+                    const quantityInSet = minifig.quantity;
+
+                    // Add minifig to minifig collection
+                    const currentMinifigQty = state.minifigCollection[figNum]?.quantity || 0;
+                    state.minifigCollection[figNum] = { quantity: currentMinifigQty + quantityInSet };
+                    minifigsAddedCount += quantityInSet;
+
+                    // Add the minifig's own parts to the main parts collection
+                    if (!minifig.parts) {
+                        minifig.parts = await fetchMinifigParts(figNum);
+                    }
+                    
+                    (minifig.parts || []).forEach(partItem => {
+                        const partId = partItem.part.part_num;
+                        const colorId = String(partItem.color.id);
+                        const quantityInMinifig = partItem.quantity;
+                        const totalQuantityToAdd = quantityInMinifig * quantityInSet;
+
+                        if (!state.collection[partId]) state.collection[partId] = {};
+                        const currentPartQty = state.collection[partId][colorId] || 0;
+                        state.collection[partId][colorId] = currentPartQty + totalQuantityToAdd;
+                        minifigPartsAddedCount += totalQuantityToAdd;
+                    });
+                }));
+            }
             
+            // 3. Save the updated state to localStorage
             saveState();
             
-            await fetchMissingCollectionPartDetails();
-            await fetchColorDetailsForCollectionParts();
+            // 4. Fetch any missing details for newly added items
+            const promises = [
+                fetchMissingCollectionPartDetails(),
+                fetchColorDetailsForCollectionParts(),
+            ];
+            if (action === 'add') {
+                promises.push(fetchMissingCollectionMinifigDetails());
+            }
+            await Promise.all(promises);
             
-            state.setModal.statusMessage = `Детали успешно ${action === 'add' ? 'добавлены' : 'удалены'}.`;
+            // 5. Set the appropriate status message
+            if (action === 'add') {
+                let messageParts = [`Детали набора успешно добавлены.`];
+                if (minifigsAddedCount > 0) {
+                    messageParts.push(`${minifigsAddedCount} минифигурок и их детали (${minifigPartsAddedCount} шт.) также добавлены.`);
+                }
+                state.setModal.statusMessage = messageParts.join(' ');
+            } else {
+                state.setModal.statusMessage = `Детали успешно удалены.`;
+            }
+            
             state.setModal.statusType = 'success';
             state.isGridStale = true;
-            updateUI();
+            updateUI(); // This will re-render everything to reflect the new collection state
         } catch (error) {
             console.error(`Bulk ${action} failed for set ${setNum}:`, error);
             state.setModal.statusMessage = `Ошибка: не удалось ${action === 'add' ? 'добавить' : 'удалить'} детали.`;
@@ -2966,6 +3019,7 @@
             }
         }
     }
+
 
     async function handleBulkAddMinifigParts(figNum) {
         // This function is now only called from the Set Modal
