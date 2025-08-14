@@ -89,12 +89,12 @@
 <body class="bg-gray-900 text-gray-200">
 
   <!-- Sidebar -->
-  <aside id="sidebar-container" class="w-72 bg-gray-800 p-4 flex flex-col h-full border-r border-gray-700 fixed inset-y-0 left-0 z-40 transition-transform duration-300 ease-in-out lg:translate-x-0 -translate-x-full"></aside>
+  <aside id="sidebar-container" class="w-80 bg-gray-800 p-4 flex flex-col h-full border-r border-gray-700 fixed inset-y-0 left-0 z-40 transition-transform duration-300 ease-in-out lg:translate-x-0 -translate-x-full"></aside>
 
   <!-- Backdrop for mobile sidebar -->
   <div id="sidebar-backdrop" class="fixed inset-0 bg-black bg-opacity-60 z-30 hidden lg:hidden"></div>
 
-  <div class="lg:ml-72 flex flex-col h-screen">
+  <div class="lg:ml-80 flex flex-col h-screen">
     <!-- Header -->
     <header id="header-container" class="bg-gray-800/50 backdrop-blur-sm sticky top-0 z-20 p-4 border-b border-gray-700"></header>
     
@@ -752,6 +752,15 @@
     }
     
     async function fetchMinifigs() {
+        // In catalog view, only fetch if there's a search query.
+        if (state.currentView === 'catalog' && !state.searchQuery) {
+            state.isLoading = false;
+            state.minifigResults = null;
+            state.searchMinifigResults = null;
+            updateUI();
+            return;
+        }
+
         state.isLoading = true;
         state.apiError = null;
         state.minifigResults = null;
@@ -765,6 +774,12 @@
             
             if (state.searchQuery) {
                 params.append('search', state.searchQuery);
+            } else {
+                // Should not happen in catalog view due to guard clause above,
+                // but this handles collection view searches that might be empty.
+                state.isLoading = false;
+                updateUI();
+                return;
             }
 
             let ordering;
@@ -772,8 +787,8 @@
             else if (state.sortBy === 'name_desc') ordering = '-name';
             else if (state.sortBy === 'num_parts_desc') ordering = '-num_parts';
             else if (state.sortBy === 'num_parts_asc') ordering = 'num_parts';
-
-            if(ordering) params.append('ordering', ordering);
+            
+            if(ordering && state.sortBy !== 'relevance') params.append('ordering', ordering);
 
             const rawMinifigs = await apiFetchPaginated(`/minifigs/?${params.toString()}`);
             const minifigs = rawMinifigs.map(mf => {
@@ -781,11 +796,7 @@
                 return mf;
             });
             
-            if (state.searchQuery) {
-                state.searchMinifigResults = minifigs;
-            } else {
-                state.minifigResults = minifigs;
-            }
+            state.searchMinifigResults = minifigs;
 
         } catch (error) {
             console.error("Ошибка загрузки минифигурок Rebrickable:", error);
@@ -1239,7 +1250,9 @@
 
       const viewButtonStyle = (view) => `flex items-center w-full p-3 text-base font-semibold rounded-lg transition-colors duration-150 ${state.currentView === view ? 'bg-blue-600 text-white' : 'text-gray-400 hover:bg-gray-700 hover:text-white'}`;
       
-      const subViewButtonStyle = (subView) => `flex-1 py-1.5 px-2 rounded-md text-sm font-semibold transition-colors duration-200 ${state.activeSubView === subView ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-600 hover:text-white'}`;
+      const subViewButtonStyle = (subView) => `flex-1 py-2 px-1 rounded-lg text-sm font-semibold transition-colors duration-200 flex flex-col items-center justify-center gap-1.5 ${state.activeSubView === subView ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white'}`;
+      const badgeStyle = (subView) => `text-xs px-1.5 py-0.5 rounded-full ${state.activeSubView === subView ? 'bg-blue-400/80 text-white' : 'bg-gray-600 text-gray-200'}`;
+
 
       let mainListContent = '';
       let mainListTitle = '';
@@ -1432,10 +1445,28 @@
             <button data-view="collection" class="${viewButtonStyle('collection')}">${CollectionIcon('w-5 h-5 mr-3')}<span>Коллекция</span></button>
         </div>
 
-        <div class="mb-4 p-1 bg-gray-900/50 rounded-lg flex space-x-1">
-            <button data-sub-view="parts" class="${subViewButtonStyle('parts')}">${BrickIcon('w-4 h-4 mr-1.5')}Детали</button>
-            <button data-sub-view="sets" class="${subViewButtonStyle('sets')}">${SetsIcon('w-4 h-4 mr-1.5')}Наборы</button>
-            <button data-sub-view="minifigs" class="${subViewButtonStyle('minifigs')}">${MinifigIcon('w-4 h-4 mr-1.5')}Фигурки</button>
+        <div class="mb-4 p-1 bg-gray-900/50 rounded-xl grid grid-cols-3 gap-1">
+            <button data-sub-view="parts" class="${subViewButtonStyle('parts')}">
+                ${BrickIcon('w-5 h-5')}
+                <span class="flex items-center gap-1.5">
+                    Детали
+                    <span class="${badgeStyle('parts')}">${uniqueModelsCount}</span>
+                </span>
+            </button>
+            <button data-sub-view="sets" class="${subViewButtonStyle('sets')}">
+                ${SetsIcon('w-5 h-5')}
+                 <span class="flex items-center gap-1.5">
+                    Наборы
+                    <span class="${badgeStyle('sets')}">${uniqueSetsCount}</span>
+                </span>
+            </button>
+            <button data-sub-view="minifigs" class="${subViewButtonStyle('minifigs')}">
+                ${MinifigIcon('w-5 h-5')}
+                 <span class="flex items-center gap-1.5">
+                    Фигурки
+                    <span class="${badgeStyle('minifigs')}">${uniqueMinifigsCount}</span>
+                </span>
+            </button>
         </div>
         
         <div id="sidebar-scroll-container" class="flex-grow overflow-y-auto no-scrollbar">
@@ -1722,7 +1753,7 @@
                 renderFn = (item) => renderSetCard(item, state.isGridStale);
                 emptyMessage = state.searchQuery ? 'По вашему запросу ничего не найдено.' : 'Выберите тему для просмотра наборов.';
             } else { // minifigs
-                itemsToDisplay = state.searchQuery ? state.searchMinifigResults : state.minifigResults;
+                itemsToDisplay = state.searchMinifigResults;
                 renderFn = (item) => renderMinifigCard(item, state.isGridStale);
                 emptyMessage = state.searchQuery ? 'По вашему запросу ничего не найдено.' : 'Используйте поиск для навигации по минифигуркам.';
             }
@@ -3305,10 +3336,6 @@
             state.selectedSetCollectionThemeId = null;
             
             updateUI();
-            
-            if (state.currentView === 'catalog' && state.activeSubView === 'minifigs' && !state.minifigResults) {
-                fetchMinifigs();
-            }
             return;
         }
         
@@ -3340,10 +3367,6 @@
             else state.sortBy = 'popularity';
 
             updateUI();
-
-            if (state.currentView === 'catalog' && newSubView === 'minifigs' && !state.minifigResults) {
-                fetchMinifigs();
-            }
             return;
         }
 
