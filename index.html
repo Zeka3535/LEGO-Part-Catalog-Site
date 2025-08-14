@@ -751,34 +751,17 @@
     }
     
     async function fetchMinifigs() {
-        // In catalog view, only fetch if there's a search query.
-        if (state.currentView === 'catalog' && !state.searchQuery) {
-            state.isLoading = false;
-            state.minifigResults = null;
-            state.searchMinifigResults = null;
-            updateUI();
-            return;
-        }
-
         state.isLoading = true;
         state.apiError = null;
-        state.minifigResults = null;
-        state.searchMinifigResults = null;
-        state.itemsToDisplay = state.itemsIncrement;
+        state.itemsToDisplay = state.itemsIncrement; // Use current increment (20 for minifigs)
         state.isGridStale = true;
-        updateUI();
+        updateUI(); // Show loader
 
         try {
             let params = new URLSearchParams();
             
             if (state.searchQuery) {
                 params.append('search', state.searchQuery);
-            } else {
-                // Should not happen in catalog view due to guard clause above,
-                // but this handles collection view searches that might be empty.
-                state.isLoading = false;
-                updateUI();
-                return;
             }
 
             let ordering;
@@ -795,7 +778,13 @@
                 return mf;
             });
             
-            state.searchMinifigResults = minifigs;
+            if (state.searchQuery) {
+                state.searchMinifigResults = minifigs;
+                state.minifigResults = null;
+            } else {
+                state.minifigResults = minifigs;
+                state.searchMinifigResults = null;
+            }
 
         } catch (error) {
             console.error("Ошибка загрузки минифигурок Rebrickable:", error);
@@ -930,6 +919,20 @@
         }
     }
 
+    async function fetchMinifigDetails(figNum) {
+        if (MINIFIG_MAP[figNum]) return;
+        try {
+            const response = await fetch(`${REBRICKABLE_API_URL}/minifigs/${figNum}/`, {
+                headers: { 'Authorization': `key ${getApiKey()}` }
+            });
+            if (!response.ok) throw new Error(`Minifig ${figNum} not found.`);
+            const minifig = await response.json();
+            MINIFIG_MAP[minifig.set_num] = minifig;
+        } catch (err) {
+            console.error(`Could not fetch details for minifig ${figNum}:`, err);
+        }
+    }
+
     async function fetchMissingCollectionMinifigDetails() {
         const collectionFigNums = Object.keys(state.minifigCollection);
         const missingFigNums = collectionFigNums.filter(num => !MINIFIG_MAP[num] || !MINIFIG_MAP[num].name);
@@ -938,17 +941,8 @@
         console.log(`Fetching details for ${missingFigNums.length} minifigs from collection...`);
         
         for (const figNum of missingFigNums) {
-            try {
-                const response = await fetch(`${REBRICKABLE_API_URL}/minifigs/${figNum}/`, {
-                    headers: { 'Authorization': `key ${getApiKey()}` }
-                });
-                if (!response.ok) throw new Error(`Minifig ${figNum} not found.`);
-                const minifig = await response.json();
-                MINIFIG_MAP[minifig.set_num] = minifig;
-                await new Promise(resolve => setTimeout(resolve, 200));
-            } catch(err) {
-                console.error(`Could not fetch details for minifig ${figNum}:`, err);
-            }
+            await fetchMinifigDetails(figNum);
+            await new Promise(resolve => setTimeout(resolve, 200));
         }
     }
 
@@ -1249,8 +1243,13 @@
 
       const viewButtonStyle = (view) => `flex items-center w-full p-3 text-base font-semibold rounded-lg transition-colors duration-150 ${state.currentView === view ? 'bg-blue-600 text-white' : 'text-gray-400 hover:bg-gray-700 hover:text-white'}`;
       
-      const subViewButtonStyle = (subView) => `flex-1 py-2 px-1 rounded-lg text-sm font-semibold transition-colors duration-200 flex flex-col items-center justify-center gap-1.5 ${state.activeSubView === subView ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white'}`;
-      const badgeStyle = (subView) => `text-xs px-1.5 py-0.5 rounded-full ${state.activeSubView === subView ? 'bg-blue-400/80 text-white' : 'bg-gray-600 text-gray-200'}`;
+      const subViewButtonStyle = (subView) => `relative flex-1 py-2 px-1 rounded-lg text-sm font-semibold transition-colors duration-200 flex flex-col items-center justify-center gap-1 ${state.activeSubView === subView ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white'}`;
+
+      const badge = (subView, count) => {
+            if (count === 0) return '';
+            const style = `absolute top-1 right-1 text-xs px-1.5 py-0.5 rounded-full font-bold ${state.activeSubView === subView ? 'bg-blue-200 text-blue-800' : 'bg-gray-600 text-gray-200'}`;
+            return `<span class="${style}">${count}</span>`;
+      };
 
 
       let mainListContent = '';
@@ -1341,7 +1340,7 @@
         }
       } else if (state.activeSubView === 'minifigs') {
         mainListTitle = 'Минифигурки';
-        mainListContent = `<li class="text-gray-400 text-sm p-2">Используйте поиск для навигации.</li>`;
+        mainListContent = `<li class="text-gray-400 text-sm p-2">Используйте поиск или просмотрите каталог.</li>`;
       } else { // 'parts'
         mainListTitle = 'Категории';
         let categoriesToRender = state.categoryTree;
@@ -1447,24 +1446,18 @@
         <div class="mb-4 p-1 bg-gray-900/50 rounded-xl grid grid-cols-3 gap-1">
             <button data-sub-view="parts" class="${subViewButtonStyle('parts')}">
                 ${BrickIcon('w-5 h-5')}
-                <span class="flex items-center gap-1.5">
-                    Детали
-                    <span class="${badgeStyle('parts')}">${uniqueModelsCount}</span>
-                </span>
+                <span class="mt-1">Детали</span>
+                ${badge('parts', uniqueModelsCount)}
             </button>
             <button data-sub-view="sets" class="${subViewButtonStyle('sets')}">
                 ${SetsIcon('w-5 h-5')}
-                 <span class="flex items-center gap-1.5">
-                    Наборы
-                    <span class="${badgeStyle('sets')}">${uniqueSetsCount}</span>
-                </span>
+                <span class="mt-1">Наборы</span>
+                ${badge('sets', uniqueSetsCount)}
             </button>
             <button data-sub-view="minifigs" class="${subViewButtonStyle('minifigs')}">
                 ${MinifigIcon('w-5 h-5')}
-                 <span class="flex items-center gap-1.5">
-                    Фигурки
-                    <span class="${badgeStyle('minifigs')}">${uniqueMinifigsCount}</span>
-                </span>
+                <span class="mt-1">Фигурки</span>
+                ${badge('minifigs', uniqueMinifigsCount)}
             </button>
         </div>
         
@@ -1476,6 +1469,7 @@
         </div>
         
         <div class="flex-shrink-0 mt-4 border-t border-gray-700 pt-4 space-y-4">
+            ${state.currentView === 'collection' ? `
             <div>
                 <h2 class="text-lg font-semibold text-white mb-3">Сводка коллекции</h2>
                 ${totalPartsCount === 0 && uniqueSetsCount === 0 && uniqueMinifigsCount === 0 ? '<p class="text-gray-400 text-sm">Ваша коллекция пуста.</p>' : `
@@ -1495,6 +1489,7 @@
                   </div>
                 `}
             </div>
+            ` : ''}
             <button id="settings-button" class="w-full flex items-center justify-center px-3 py-2 text-sm font-semibold rounded-md transition-colors duration-150 bg-gray-600 hover:bg-gray-500 text-white">
                 ${SettingsIcon('w-5 h-5 mr-2')} Настройки
             </button>
@@ -1752,9 +1747,9 @@
                 renderFn = (item) => renderSetCard(item, state.isGridStale);
                 emptyMessage = state.searchQuery ? 'По вашему запросу ничего не найдено.' : 'Выберите тему для просмотра наборов.';
             } else { // minifigs
-                itemsToDisplay = state.searchMinifigResults;
+                itemsToDisplay = state.searchQuery ? state.searchMinifigResults : state.minifigResults;
                 renderFn = (item) => renderMinifigCard(item, state.isGridStale);
-                emptyMessage = state.searchQuery ? 'По вашему запросу ничего не найдено.' : 'Используйте поиск для навигации по минифигуркам.';
+                emptyMessage = state.searchQuery ? 'По вашему запросу ничего не найдено.' : 'В каталоге нет минифигурок. Попробуйте поиск.';
             }
 
             if (!itemsToDisplay || itemsToDisplay.length === 0) {
@@ -2875,9 +2870,12 @@
         }
     }
     
-    function handleUpdateMinifigCollection(figNum, quantity) {
+    async function handleUpdateMinifigCollection(figNum, quantity) {
         if (quantity > 0) {
             state.minifigCollection[figNum] = { quantity };
+            if (!MINIFIG_MAP[figNum]) {
+                await fetchMinifigDetails(figNum);
+            }
         } else {
             delete state.minifigCollection[figNum];
         }
@@ -3272,7 +3270,7 @@
         }
     }
     
-    document.addEventListener('click', (e) => {
+    document.addEventListener('click', async (e) => {
         if (!(e.target instanceof Element)) return;
         const target = e.target;
 
@@ -3346,8 +3344,12 @@
             state.selectedCollectionCategoryId = null;
             state.selectedThemeId = null;
             state.selectedSetCollectionThemeId = null;
-            
-            updateUI();
+
+            if (state.currentView === 'catalog' && state.activeSubView === 'minifigs') {
+                fetchMinifigs();
+            } else {
+                updateUI();
+            }
             return;
         }
         
@@ -3385,7 +3387,11 @@
             else if (newSubView === 'minifigs') state.sortBy = 'name_asc';
             else state.sortBy = 'popularity';
 
-            updateUI();
+            if (state.currentView === 'catalog' && newSubView === 'minifigs') {
+                fetchMinifigs();
+            } else {
+                updateUI();
+            }
             return;
         }
 
@@ -3480,7 +3486,7 @@
         
         const deleteButton = target.closest('[data-action="delete-from-collection"]');
         if (deleteButton?.dataset.partId && deleteButton.dataset.colorId) {
-            handleUpdateCollection(deleteButton.dataset.partId, deleteButton.dataset.colorId, 0);
+            await handleUpdateCollection(deleteButton.dataset.partId, deleteButton.dataset.colorId, 0);
             return;
         }
 
@@ -3641,12 +3647,12 @@
                     break;
                 case 'update-minifig-collection':
                     if (state.selectedFigNum) {
-                        handleUpdateMinifigCollection(state.selectedFigNum, state.minifigModal.quantity);
+                        await handleUpdateMinifigCollection(state.selectedFigNum, state.minifigModal.quantity);
                     }
                     break;
                 case 'delete-from-minifig-collection-modal':
                     if (state.selectedFigNum) {
-                        handleUpdateMinifigCollection(state.selectedFigNum, 0);
+                        await handleUpdateMinifigCollection(state.selectedFigNum, 0);
                         state.minifigModal.quantity = 1;
                     }
                     break;
@@ -3727,7 +3733,7 @@
                 case 'add-minifig-to-collection':
                     if (figNum && quantity) {
                         const currentQty = state.minifigCollection[figNum]?.quantity || 0;
-                        handleUpdateMinifigCollection(figNum, currentQty + parseInt(quantity, 10));
+                        await handleUpdateMinifigCollection(figNum, currentQty + parseInt(quantity, 10));
                     }
                     break;
                 case 'add-minifig-parts-to-collection':
@@ -3818,7 +3824,7 @@
                         break;
                     case 'delete-from-collection-modal':
                          if (state.selectedPartId && state.modal.selectedColorId) {
-                            handleUpdateCollection(state.selectedPartId, state.modal.selectedColorId, 0);
+                            await handleUpdateCollection(state.selectedPartId, state.modal.selectedColorId, 0);
                             state.modal.quantity = 1; // Reset quantity for next interaction
                             updateModalControlsState();
                         }
