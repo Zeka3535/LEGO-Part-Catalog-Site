@@ -753,7 +753,7 @@
     async function fetchMinifigs() {
         state.isLoading = true;
         state.apiError = null;
-        state.itemsToDisplay = state.itemsIncrement; // Use current increment (20 for minifigs)
+        state.itemsToDisplay = state.itemsIncrement;
         state.isGridStale = true;
         updateUI(); // Show loader
 
@@ -1447,17 +1447,17 @@
             <button data-sub-view="parts" class="${subViewButtonStyle('parts')}">
                 ${BrickIcon('w-5 h-5')}
                 <span class="mt-1">Детали</span>
-                ${badge('parts', uniqueModelsCount)}
+                ${badge('parts', state.currentView === 'collection' ? totalPartsCount : 0)}
             </button>
             <button data-sub-view="sets" class="${subViewButtonStyle('sets')}">
                 ${SetsIcon('w-5 h-5')}
                 <span class="mt-1">Наборы</span>
-                ${badge('sets', uniqueSetsCount)}
+                ${badge('sets', state.currentView === 'collection' ? totalSetsCount : 0)}
             </button>
             <button data-sub-view="minifigs" class="${subViewButtonStyle('minifigs')}">
                 ${MinifigIcon('w-5 h-5')}
                 <span class="mt-1">Фигурки</span>
-                ${badge('minifigs', uniqueMinifigsCount)}
+                ${badge('minifigs', state.currentView === 'collection' ? totalMinifigsCount : 0)}
             </button>
         </div>
         
@@ -1960,7 +1960,7 @@
         const theme = THEME_MAP[set.theme_id];
         
         return `
-        <div class="flex-grow flex flex-col lg:flex-row overflow-y-auto no-scrollbar h-full">
+        <div class="flex flex-col lg:flex-row">
             <div class="lg:w-1/2 p-4 sm:p-6 bg-gray-900/30 flex items-center justify-center flex-shrink-0 border-b lg:border-b-0 lg:border-r border-gray-700">
                  <div class="w-48 h-48 sm:w-64 sm:h-64 bg-white rounded-lg flex items-center justify-center overflow-hidden shadow-lg relative">
                     <img ${getPartImageUrl(set.set_img_url)} alt="${set.name}" class="max-w-full max-h-full object-contain">
@@ -2002,7 +2002,7 @@
     }
 
     function renderSetModalInventoryView() {
-        return `<div id="set-inventory-container" class="p-4 flex flex-col overflow-y-auto no-scrollbar h-full">
+        return `<div id="set-inventory-container" class="p-4 flex flex-col">
             ${renderSetInventory()}
         </div>`;
     }
@@ -2052,7 +2052,7 @@
                     <button id="set-modal-close" class="text-gray-400 hover:text-white transition-colors">${XIcon('w-6 h-6')}</button>
                  </div>
             </div>
-            <div id="set-modal-view-container" class="flex-grow overflow-hidden" style="min-height: 0;">
+            <div id="set-modal-view-container" class="flex-grow overflow-y-auto no-scrollbar" style="min-height: 0;">
                 <!-- View content is injected by updateSetModalView -->
             </div>
         </div>
