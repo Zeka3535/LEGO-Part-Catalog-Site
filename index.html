@@ -1391,7 +1391,7 @@
                 const isFav = state.favoriteThemeIds.has(theme.id);
                 const heartClasses = isFav
                     ? 'text-red-400 opacity-100'
-                    : 'text-gray-500 opacity-0 group-hover:opacity-100';
+                    : 'text-gray-500 lg:opacity-0 lg:group-hover:opacity-100';
 
                 return `
                     <li class="space-y-1">
@@ -1472,7 +1472,7 @@
                    const isSelected = (state.currentView === 'catalog' && state.selectedCategoryId === cat.id) || (state.currentView === 'collection' && state.selectedCollectionCategoryId === cat.id);
                    const buttonStyle = isSelected ? 'bg-blue-600/80 text-white' : 'text-gray-400 hover:bg-gray-700/50 hover:text-gray-200';
                    const isFav = state.favoriteCategoryIds.has(cat.id);
-                   const heartClasses = isFav ? 'text-red-400 opacity-100' : 'text-gray-500 opacity-0 group-hover:opacity-100';
+                   const heartClasses = isFav ? 'text-red-400 opacity-100' : 'text-gray-500 lg:opacity-0 lg:group-hover:opacity-100';
 
                    return `
                       <li>
@@ -1910,7 +1910,7 @@
                     case 'year_asc': collectionItems.sort((a, b) => a.year - b.year); break;
                     case 'year_desc': collectionItems.sort((a, b) => b.year - a.year); break;
                     case 'parts_asc': collectionItems.sort((a, b) => a.num_parts - b.num_parts); break;
-                    case 'parts_desc': collectionItems.sort((a, b) => b.num_parts - a.num_parts); break;
+                    case 'parts_desc': collectionItems.sort((a, b) => b.num_parts - b.num_parts); break;
                 }
                 renderFn = (item, anim, i) => renderSetCard(item, anim, i);
             } else { // minifigs
@@ -1919,7 +1919,7 @@
                 switch(state.sortBy) {
                     case 'name_asc': collectionItems.sort((a, b) => a.name.localeCompare(b.name)); break;
                     case 'name_desc': collectionItems.sort((a, b) => b.name.localeCompare(a.name)); break;
-                    case 'num_parts_desc': collectionItems.sort((a, b) => b.num_parts - a.num_parts); break;
+                    case 'num_parts_desc': collectionItems.sort((a, b) => b.num_parts - b.num_parts); break;
                     case 'num_parts_asc': collectionItems.sort((a, b) => a.num_parts - b.num_parts); break;
                 }
                 renderFn = (item, anim, i) => renderMinifigCard(item, anim, i);
