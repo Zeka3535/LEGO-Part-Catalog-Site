@@ -128,7 +128,14 @@ let S = {
     },
     minifigModal: {
         loading: !1,
-        qty: 1
+        qty: 1,
+        view: 'details',
+        inv: null,
+        loadingInv: !1,
+        invError: !1,
+        bulkUpdate: !1,
+        status: '',
+        statusType: ''
     },
     filterOpen: !1,
     settingsOpen: !1,
@@ -825,21 +832,8 @@ function filterThemeTreeForCollection(e, t) {
 }
 
 function renderSidebar() {
-    const {
-        totalPartsCount: e,
-        uniqueModelsCount: t
-    } = Object.keys(S.coll).reduce((e, t) => {
-        const o = S.coll[t] || {},
-            l = Object.keys(o);
-        if (l.length > 0) {
-            e.uniqueModelsCount += l.length;
-            e.totalPartsCount += Object.values(o).reduce((e, t) => e + t, 0);
-        }
-        return e
-    }, {
-        uniqueModelsCount: 0,
-        totalPartsCount: 0
-    });
+    const e = Object.values(S.coll).reduce((e, t) => e + Object.values(t).reduce((e, t) => e + t, 0), 0);
+    const t = Object.keys(S.coll).reduce((e, t) => e + Object.keys(S.coll[t]).length, 0);
     const o = Object.values(S.setColl).reduce((e, t) => e + t.qty, 0);
     const l = Object.keys(S.setColl).length;
     const a = Object.values(S.minifigColl).reduce((e, t) => e + t.qty, 0);
@@ -847,11 +841,11 @@ function renderSidebar() {
     const n = (e) => `flex items-center w-full p-3 text-base font-semibold rounded-lg transition-colors duration-150 ${S.view===e?"bg-blue-600 text-white":"text-gray-400 hover:bg-gray-700 hover:text-white"}`;
     const r = (e) => `relative flex-1 py-2 px-1 rounded-lg text-sm font-semibold transition-colors duration-200 flex flex-col items-center justify-center gap-1 ${S.subView===e?"bg-blue-600 text-white":"text-gray-300 hover:bg-gray-700 hover:text-white"}`;
     const s = (e, t, o) => {
-        if (t === 0 || "collection" !== S.view) return "";
+        if (o === 0 || "collection" !== S.view) return "";
         const l = t;
         const i = l >= 1e3 ? "text-[10px] px-1" : "text-xs px-1.5";
         const a = `absolute top-1 right-1 ${i} py-0.5 rounded-full font-bold ${S.subView===e?"bg-blue-200 text-blue-800":"bg-gray-600 text-gray-200"}`;
-        return `<span class="${a}">${l}</span>`
+        return `<span class="${a}">${l.toLocaleString("ru-RU")}</span>`
     };
     let c = "",
         d = "";
@@ -1025,15 +1019,15 @@ function renderSidebar() {
                   <div class="space-y-1">
                       <div class="flex justify-between items-center text-sm text-gray-400">
                           <span>${I_Brick("inline-block w-4 h-4 mr-1")} Детали</span>
-                          <span class="font-semibold text-white">${t} уник. / ${e} всего</span>
+                          <span class="font-semibold text-white">${t.toLocaleString("ru-RU")} уник. / ${e.toLocaleString("ru-RU")} всего</span>
                       </div>
                       <div class="flex justify-between items-center text-sm text-gray-400">
                           <span>${I_Set("inline-block w-4 h-4 mr-1")} Наборы</span>
-                          <span class="font-semibold text-white">${l} уник. / ${o} всего</span>
+                          <span class="font-semibold text-white">${l.toLocaleString("ru-RU")} уник. / ${o.toLocaleString("ru-RU")} всего</span>
                       </div>
                        <div class="flex justify-between items-center text-sm text-gray-400">
                           <span>${I_Minifig("inline-block w-4 h-4 mr-1")} Минифигурки</span>
-                          <span class="font-semibold text-white">${i} уник. / ${a} всего</span>
+                          <span class="font-semibold text-white">${i.toLocaleString("ru-RU")} уник. / ${a.toLocaleString("ru-RU")} всего</span>
                       </div>
                   </div>
                 `}
@@ -2161,68 +2155,154 @@ function renderMinifigModal(e = !1) {
     if (!S.selFigNum) return void closeMinifigModal();
     const t = MINIFIG_MAP[S.selFigNum];
     if (!t) return void closeMinifigModal();
-    e && (document.body.classList.add("overflow-hidden"), minifigModalEl.classList.remove("modal-hidden"), requestAnimationFrame(() => minifigModalEl.classList.add("visible")));
-    const {
-        qty: o
-    } = S.minifigModal, l = S.minifigColl[S.selFigNum]?.qty || 0, a = `
-            <div class="bg-gray-700/50 rounded-lg p-4">
-                <div class="space-y-4">
-                    <div class="flex justify-between items-center">
-                        <h3 class="text-white font-semibold">Коллекция минифигурок</h3>
-                        <p class="text-sm text-gray-400 text-right">В коллекции: <span class="font-bold text-white">${l}</span></p>
-                    </div>
-                    
-                    <div class="flex justify-between items-center gap-4">
-                        <div class="flex items-center gap-2">
-                            <button data-action="decrease-minifig-qty" class="p-2 rounded-full bg-gray-600 hover:bg-gray-500 text-white transition-colors">${I_Minus("w-5 h-5")}</button>
-                            <input type="number" value="${o}" readonly class="w-12 text-center bg-gray-900 text-white font-bold rounded-md py-1"/>
-                            <button data-action="increase-minifig-qty" class="p-2 rounded-full bg-gray-600 hover:bg-gray-500 text-white transition-colors">${I_Plus("w-5 h-5")}</button>
-                        </div>
-                        <button data-action="update-minifig-collection" class="flex-grow bg-blue-600 text-white font-bold py-2 px-4 rounded-md hover:bg-blue-700 transition-colors">
-                            ${l>0?"Обновить":"Добавить"}
-                        </button>
-                    </div>
-                    ${l>0?`
-                        <div>
-                            <button data-action="delete-from-minifig-collection-modal" class="w-full mt-1 text-sm text-red-400 hover:text-red-300 hover:bg-red-900/50 rounded-md py-1.5 transition-colors">Удалить из коллекции</button>
-                        </div>
-                    `:"<div></div>"}
-                </div>
-            </div>`;
-    minifigModalEl.innerHTML = `
-        <div id="minifig-modal-content" class="bg-gray-800 rounded-lg shadow-xl w-[calc(100%-2rem)] max-w-4xl flex flex-col max-h-[calc(100vh-2rem)] ${e?"modal-content-enter":""}">
+    const o = e ? "modal-content-enter" : "",
+        l = "inventory" === S.minifigModal.view;
+    e && (document.body.classList.add("overflow-hidden"), minifigModalEl.classList.remove("modal-hidden"), requestAnimationFrame(() => minifigModalEl.classList.add("visible"))), minifigModalEl.innerHTML = `
+        <div id="minifig-modal-content" class="bg-gray-800 rounded-lg shadow-xl w-[calc(100%-2rem)] ${l?"max-w-2xl":"max-w-4xl"} flex flex-col ${l?"h-[calc(100vh-4rem)]":"max-h-[calc(100vh-2rem)]"} ${o} transition-all duration-300">
             <div class="flex-shrink-0 p-4 border-b border-gray-700 flex justify-between items-center gap-4">
                  <h2 class="text-xl lg:text-2xl font-bold text-white truncate pr-4">${t.name}</h2>
                  <div class="flex items-center gap-2 flex-shrink-0">
+                    ${renderMinifigModalToggleButton()}
                     <button id="minifig-modal-close" class="text-gray-400 hover:text-white transition-colors">${I_X("w-6 h-6")}</button>
                  </div>
             </div>
-            <div class="flex-grow overflow-y-auto no-scrollbar">
-                <div class="flex flex-col lg:flex-row">
-                    <div class="lg:w-1/2 p-4 sm:p-6 bg-gray-900/30 flex items-center justify-center flex-shrink-0 border-b lg:border-b-0 lg:border-r border-gray-700">
-                         <div data-action="view-image-fullscreen" data-image-url="${t.set_img_url||""}" class="w-48 h-48 sm:w-64 sm-h-64 bg-white rounded-lg flex items-center justify-center overflow-hidden shadow-lg relative cursor-pointer group">
-                            <img ${getPartImageUrl(t.set_img_url)} alt="${t.name}" class="max-w-full max-h-full object-contain">
-                             <div class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                               ${I_Search("w-10 h-10 text-white")}
-                            </div>
-                         </div>
-                    </div>
-                    <div class="lg:w-1/2 p-4 sm:p-6 flex flex-col">
-                        <div class="space-y-6">
-                            <div>
-                                <h3 class="text-md font-semibold text-gray-300 mb-3">Информация</h3>
-                                <div class="space-y-1 text-sm text-gray-400">
-                                    <p>ID: ${t.set_num}</p>
-                                    <p>Кол-во деталей: ${t.num_parts}</p>
-                                </div>
-                            </div>
-                            ${a}
-                        </div>
-                    </div>
-                </div>
+            <div id="minifig-modal-view-container" class="flex-grow overflow-y-auto no-scrollbar" style="min-height: 0;">
             </div>
         </div>
-        `
+        `, updateMinifigModalView()
+}
+
+function updateMinifigModalView() {
+    if (!S.selFigNum) return;
+    const e = document.getElementById("minifig-modal-view-container");
+    e && ("details" === S.minifigModal.view ? e.innerHTML = renderMinifigModalDetailsView() : e.innerHTML = renderMinifigModalInventoryView())
+}
+
+function renderMinifigModalToggleButton() {
+    const e = MINIFIG_MAP[S.selFigNum];
+    return e ? "details" === S.minifigModal.view ? `<button data-action="toggle-minifig-modal-view" class="flex items-center gap-2 px-3 py-1.5 text-sm font-semibold rounded-md transition-colors bg-gray-600 hover:bg-gray-500 text-white">
+                ${I_Brick("w-5 h-5")}
+                <span>Инвентарь</span>
+                <span class="text-xs bg-gray-700 text-gray-200 px-1.5 py-0.5 rounded-full">${e.num_parts}</span>
+            </button>` : `<button data-action="toggle-minifig-modal-view" class="flex items-center gap-2 px-3 py-1.5 text-sm font-semibold rounded-md transition-colors bg-blue-600 hover:bg-blue-700 text-white">
+                ${I_Cat("w-5 h-5")}
+                <span>Детали минифигурки</span>
+            </button>` : ""
+}
+
+function renderMinifigModalDetailsView() {
+    if (!S.selFigNum) return "";
+    const e = MINIFIG_MAP[S.selFigNum];
+    const {
+        qty: t
+    } = S.minifigModal;
+    const o = S.minifigColl[S.selFigNum]?.qty || 0;
+    const l = `
+        <div class="bg-gray-700/50 rounded-lg p-4">
+            <div class="space-y-4">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-white font-semibold">Коллекция минифигурок</h3>
+                    <p class="text-sm text-gray-400 text-right">В коллекции: <span class="font-bold text-white">${o}</span></p>
+                </div>
+                
+                <div class="flex justify-between items-center gap-4">
+                    <div class="flex items-center gap-2">
+                        <button data-action="decrease-minifig-qty" class="p-2 rounded-full bg-gray-600 hover:bg-gray-500 text-white transition-colors">${I_Minus("w-5 h-5")}</button>
+                        <input type="number" value="${t}" readonly class="w-12 text-center bg-gray-900 text-white font-bold rounded-md py-1"/>
+                        <button data-action="increase-minifig-qty" class="p-2 rounded-full bg-gray-600 hover:bg-gray-500 text-white transition-colors">${I_Plus("w-5 h-5")}</button>
+                    </div>
+                    <button data-action="update-minifig-collection" class="flex-grow bg-blue-600 text-white font-bold py-2 px-4 rounded-md hover:bg-blue-700 transition-colors">
+                        ${o>0?"Обновить":"Добавить"}
+                    </button>
+                </div>
+                ${o>0?`
+                    <div>
+                        <button data-action="delete-from-minifig-collection-modal" class="w-full mt-1 text-sm text-red-400 hover:text-red-300 hover:bg-red-900/50 rounded-md py-1.5 transition-colors">Удалить из коллекции</button>
+                    </div>
+                `:"<div></div>"}
+            </div>
+        </div>`;
+    return `
+        <div class="flex flex-col lg:flex-row">
+            <div class="lg:w-1/2 p-4 sm:p-6 bg-gray-900/30 flex items-center justify-center flex-shrink-0 border-b lg:border-b-0 lg:border-r border-gray-700">
+                 <div data-action="view-image-fullscreen" data-image-url="${e.set_img_url||""}" class="w-48 h-48 sm:w-64 sm-h-64 bg-white rounded-lg flex items-center justify-center overflow-hidden shadow-lg relative cursor-pointer group">
+                    <img ${getPartImageUrl(e.set_img_url)} alt="${e.name}" class="max-w-full max-h-full object-contain">
+                     <div class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                       ${I_Search("w-10 h-10 text-white")}
+                    </div>
+                 </div>
+            </div>
+            <div class="lg:w-1/2 p-4 sm:p-6 flex flex-col">
+                <div class="space-y-6">
+                    <div>
+                        <h3 class="text-md font-semibold text-gray-300 mb-3">Информация</h3>
+                        <div class="space-y-1 text-sm text-gray-400">
+                            <p><span class="font-semibold text-gray-300">Название:</span> ${e.name}</p>
+                            <p>ID: ${e.set_num}</p>
+                            <p>Кол-во деталей: ${e.num_parts}</p>
+                        </div>
+                    </div>
+                    ${l}
+                </div>
+            </div>
+        </div>`
+}
+
+function renderMinifigModalInventoryView() {
+    const {
+        inv: e,
+        loadingInv: t,
+        invError: o,
+        bulkUpdate: l,
+        status: a,
+        statusType: i
+    } = S.minifigModal;
+    const n = MINIFIG_MAP[S.selFigNum];
+    let r = "";
+    if (t) {
+        r = `<div class="flex items-center justify-center h-full p-4"><div class="loader"></div></div>`;
+    } else if (o) {
+        r = `<div class="text-center p-4">
+                <p class="text-red-400 mb-3">Не удалось загрузить инвентарь.</p>
+                <button data-action="retry-load-minifig-inv" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">Попробовать снова</button>
+            </div>`;
+    } else if (e) {
+        if (e.length === 0) {
+            r = `<p class="text-gray-400 text-center p-4">Инвентарь для этой минифигурки не найден.</p>`;
+        } else {
+            const t = e.map(e => `
+                <div class="flex items-center bg-gray-700/50 p-2 rounded-md gap-3 text-sm">
+                    <div class="w-12 h-12 bg-white rounded-md flex items-center justify-center flex-shrink-0">
+                        <img ${getPartImageUrl(e.part.part_img_url)} alt="${e.part.name}" class="w-full h-full object-contain p-1">
+                    </div>
+                    <div class="flex-grow truncate">
+                        <p class="text-white font-semibold truncate">${e.part.name}</p>
+                        <p class="text-gray-400 truncate">${e.part.part_num}</p>
+                    </div>
+                    <div class="flex items-center gap-2 flex-shrink-0">
+                        <span class="w-5 h-5 rounded-full border border-gray-500 ${e.color.isTransparent?"checkerboard":""}" style="background-color: ${e.color.hex};" title="${e.color.name}"></span>
+                        <span class="text-gray-300 w-8 text-right">${e.quantity}x</span>
+                    </div>
+                </div>`).join("");
+            r = `<div class="space-y-2">${t}</div>`;
+        }
+    }
+    return `
+        <div class="p-4 space-y-4">
+            <div class="flex justify-between items-center bg-gray-700/50 p-3 rounded-lg">
+                <h3 class="text-lg font-semibold text-white">Инвентарь деталей</h3>
+                ${l?`<div class="flex items-center gap-2 text-sm text-gray-300">
+                        <div class="loader !w-4 !h-4 !border-2"></div>
+                        <span>Добавление...</span>
+                    </div>`: (e && e.length > 0) ? `
+                    <button data-action="add-minifig-parts-modal" class="flex items-center gap-2 text-sm px-3 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white transition-colors disabled:opacity-50" ${l?"disabled":""}>
+                        ${I_Plus("w-4 h-4")}
+                        <span>Добавить все детали в коллекцию</span>
+                    </button>`: ""}
+            </div>
+            ${a?`<div class="p-2 text-sm rounded-md ${"error"===i?"bg-red-900/50 text-red-300":"bg-green-900/50 text-green-300"}">${a}</div>`:""}
+            ${r}
+        </div>`;
 }
 
 function updateUI() {
@@ -2368,17 +2448,33 @@ function handleUpdateSetCollection(e, t) {
     S.selSetNum === e && updateSetModalControlsState()
 }
 async function handleUpdateMinifigCollection(e, t, o = !0) {
+    const l = S.minifigColl[e]?.qty || 0,
+        a = t - l;
+    if (0 !== a) try {
+        const t = MINIFIG_MAP[e]?.parts || await fetchMinifigParts(e);
+        MINIFIG_MAP[e] && !MINIFIG_MAP[e].parts && (MINIFIG_MAP[e].parts = t), (t || []).forEach(t => {
+            const o = t.part.part_num,
+                l = String(t.color.id),
+                i = t.quantity * a;
+            S.coll[o] || (S.coll[o] = {});
+            const n = S.coll[o][l] || 0,
+                r = n + i;
+            r > 0 ? S.coll[o][l] = r : (delete S.coll[o][l], 0 === Object.keys(S.coll[o]).length && delete S.coll[o])
+        })
+    } catch (i) {
+        console.error(`Failed to update parts for minifig ${e}:`, i)
+    }
     t > 0 ? (S.minifigColl[e] = {
         qty: t
     }, o && !MINIFIG_MAP[e]?.name && await fetchMinifigDetails(e)) : delete S.minifigColl[e], saveState(), S.gridStale = !0, "collection" === S.view ? updateUI() : (renderSidebar(), mainEl.querySelector(`.minifig-card[data-fig-num="${e}"]`)?.prepend(function() {
         if (t > 0) {
-            let e = document.createElement("div");
-            e.className = "absolute top-3 right-3 bg-blue-600 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center z-10 shadow-md", e.textContent = String(t), e
+            let t = document.createElement("div");
+            t.className = "absolute top-3 right-3 bg-blue-600 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center z-10 shadow-md", t.textContent = String(e), t
         }
         return document.createDocumentFragment();
     }()));
     S.selFigNum === e && renderMinifigModal(!1);
-    if(S.selSetNum && S.setModal.minifigs.find(m => m.set_num === e)) renderSetModal(!1);
+    if (S.selSetNum && S.setModal.minifigs.find(t => t.set_num === e)) renderSetModal(!1)
 }
 async function handleBulkUpdatePartsFromSet(e, t) {
     if (S.setModal.bulkUpdate) return;
@@ -2461,6 +2557,30 @@ async function handleBulkAddMinifigParts(e) {
         console.error("Error adding minifig parts:", o), S.setModal.status = "Ошибка при добавлении деталей.", S.setModal.statusType = "error"
     } finally {
         S.setModal.bulkUpdate = !1, S.selSetNum && renderSetModal(!1), "collection" === S.view && "parts" === S.subView ? (S.gridStale = !0, updateUI()) : renderSidebar()
+    }
+}
+async function handleBulkAddMinifigPartsFromModal(e) {
+    const t = MINIFIG_MAP[e];
+    if (!t || S.minifigModal.bulkUpdate) return;
+    S.minifigModal.bulkUpdate = !0, S.minifigModal.status = `Добавление деталей из "${t.name}"...`, S.minifigModal.statusType = "info", renderMinifigModal(!1);
+    try {
+        const o = S.minifigModal.inv || await fetchMinifigParts(e);
+        S.minifigModal.inv = o;
+        if (!o || 0 === o.length) throw new Error("Детали минифигурки не найдены.");
+        (o || []).forEach(e => {
+            const t = e.part.part_num,
+                o = String(e.color.id),
+                l = e.quantity;
+            S.coll[t] || (S.coll[t] = {}), S.coll[t][o] = (S.coll[t][o] || 0) + l
+        }), saveState(), await Promise.all([fetchMissingCollectionPartDetails(), fetchColorDetailsForCollectionParts()]);
+        const l = `Детали из "${t.name}" (${o.length} видов) добавлены.`;
+        S.minifigModal.status = l, S.minifigModal.statusType = "success", setTimeout(() => {
+            S.selFigNum && S.minifigModal.status === l && (S.minifigModal.status = "", renderMinifigModal(!1))
+        }, 3e3)
+    } catch (o) {
+        console.error("Ошибка добавления деталей минифигурки:", o), S.minifigModal.status = "Ошибка при добавлении деталей.", S.minifigModal.statusType = "error"
+    } finally {
+        S.minifigModal.bulkUpdate = !1, S.selFigNum && renderMinifigModal(!1), "collection" === S.view && "parts" === S.subView ? (S.gridStale = !0, updateUI()) : renderSidebar()
     }
 }
 
@@ -2555,7 +2675,14 @@ function closeMinifigModal() {
     e && !minifigModalEl.classList.contains("modal-hidden") && (minifigModalEl.classList.remove("visible"), e.classList.add("modal-content-leave"), !S.selPartId && !S.selSetNum && !S.filterOpen && !S.settingsOpen && viewerEl.classList.contains("viewer-hidden") && document.body.classList.remove("overflow-hidden"), e.addEventListener("animationend", () => {
         e.classList.contains("modal-content-leave") && (S.selFigNum = null, S.minifigModal = {
             loading: !1,
-            qty: 1
+            qty: 1,
+            view: 'details',
+            inv: null,
+            loadingInv: !1,
+            invError: !1,
+            bulkUpdate: !1,
+            status: '',
+            statusType: ''
         }, minifigModalEl.classList.add("modal-hidden"), minifigModalEl.innerHTML = "")
     }, {
         once: !0
@@ -2636,7 +2763,14 @@ function openModalForMinifig(e) {
         S.selFigNum = e;
         S.minifigModal = {
             loading: !1,
-            qty: S.minifigColl[e]?.qty || 1
+            qty: S.minifigColl[e]?.qty || 1,
+            view: 'details',
+            inv: null,
+            loadingInv: !1,
+            invError: !1,
+            bulkUpdate: !1,
+            status: '',
+            statusType: ''
         };
         renderMinifigModal(!0);
     }
@@ -2882,6 +3016,28 @@ document.addEventListener("click", async e => {
                     await handleUpdateMinifigCollection(S.selFigNum, 0);
                     S.minifigModal.qty = 1;
                 }
+                break;
+            case "toggle-minifig-modal-view":
+                S.minifigModal.view = "details" === S.minifigModal.view ? "inventory" : "details";
+                if ("inventory" === S.minifigModal.view && !S.minifigModal.inv) {
+                    S.minifigModal.loadingInv = !0, S.minifigModal.invError = !1, updateMinifigModalView();
+                    try {
+                        S.minifigModal.inv = await fetchMinifigParts(S.selFigNum)
+                    } catch (t) {
+                        S.minifigModal.invError = !0
+                    } finally {
+                        S.minifigModal.loadingInv = !1, updateMinifigModalView()
+                    }
+                } else updateMinifigModalView();
+                break;
+            case "add-minifig-parts-modal":
+                S.selFigNum && handleBulkAddMinifigPartsFromModal(S.selFigNum);
+                break;
+            case "retry-load-minifig-inv":
+                S.minifigModal.inv = null;
+                const o = minifigModalEl.querySelector('[data-action="toggle-minifig-modal-view"]');
+                o?.click();
+                break
         }
     } else if (setModalEl?.contains(t)) {
         const e = t.closest("[data-action]");
