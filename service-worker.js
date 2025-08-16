@@ -4,7 +4,14 @@ const IMG_HOSTS = ['cdn.rebrickable.com', 'm.rebrickable.com'];
 
 const PRECACHE_ASSETS = [
     './',
-    './index.html'
+    './index.html',
+    './site.webmanifest',
+    './apple-touch-icon.png',
+    './favicon-32x32.png',
+    './favicon-16x16.png',
+    './favicon.ico',
+    './android-chrome-192x192.png',
+    './android-chrome-512x512.png'
 ];
 
 self.addEventListener('install', event => {
