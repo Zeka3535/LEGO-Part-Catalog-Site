@@ -3,8 +3,8 @@ const API_HOST = 'rebrickable.com';
 const IMG_HOSTS = ['cdn.rebrickable.com', 'm.rebrickable.com'];
 
 const PRECACHE_ASSETS = [
-    '/',
-    '/index.html'
+    './',
+    './index.html'
 ];
 
 self.addEventListener('install', event => {
@@ -42,8 +42,15 @@ self.addEventListener('fetch', event => {
         event.respondWith(staleWhileRevalidate(event.request));
     } else if (IMG_HOSTS.includes(url.hostname)) {
         event.respondWith(cacheFirst(event.request));
-    } else if (PRECACHE_ASSETS.includes(url.pathname)) {
-        event.respondWith(caches.match(event.request));
+    } else {
+        // Для оболочки приложения и других ресурсов используйте стратегию "сначала кэш".
+        // Это более надежно, чем проверка путей, и работает с развертыванием в подкаталогах.
+        event.respondWith(
+            caches.match(event.request)
+            .then(cachedResponse => {
+                return cachedResponse || fetch(event.request);
+            })
+        );
     }
 });
 
