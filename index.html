@@ -1388,7 +1388,7 @@ function renderMainContent() {
                     t.sort((e, t) => t.num_parts - e.num_parts);
                     break;
                 case "num_parts_asc":
-                    t.sort((e, t) => t.num_parts - e.num_parts)
+                    t.sort((e, t) => e.num_parts - t.num_parts)
             }
             o = (e, t, o) => renderMinifigCard(e, t, o);
         }
@@ -1404,7 +1404,16 @@ function renderMainContent() {
                 </div>`
         }
     }
-    mainEl.innerHTML = renderAppliedFilters() + e, S.gridStale = !1
+    mainEl.innerHTML = renderAppliedFilters() + e;
+    S.gridStale = !1;
+
+    // Автоматически загружать больше контента, если нет полосы прокрутки
+    requestAnimationFrame(() => {
+        if (!S.loading && S.hasMoreItems && mainEl.scrollHeight <= mainEl.clientHeight) {
+            S.toDisplay += S.increment;
+            renderMainContent();
+        }
+    });
 }
 
 function renderSetCollectionControls() {
