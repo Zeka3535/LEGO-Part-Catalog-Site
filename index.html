@@ -243,7 +243,7 @@ async function apiFetchPaginated(e) {
     let o = 1;
     for (;;) {
         const l = e.includes("?") ? "&" : "?",
-            a = `${REBRICKABLE_API_URL}${e}${l}page=${o}&page_size=1000`,
+            a = `${REBRICKABLE_API_URL}${e}${l}page=${o}&page_size=800`,
             i = await fetch(a, {
                 headers: {
                     Authorization: `key ${getApiKey()}`
