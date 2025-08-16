@@ -684,7 +684,8 @@ async function fetchSetMinifigs(e) {
             quantity: e.quantity,
             isExpanded: !1,
             isLoadingParts: !1,
-            parts: null
+            parts: null,
+            loadingError: !1
         }))
     } catch (t) {
         console.error(`Failed to fetch minifigs for set ${e}:`, t), S.setModal.minifigs = []
@@ -694,7 +695,8 @@ async function fetchSetMinifigs(e) {
 }
 async function fetchMinifigParts(e) {
     try {
-        return (await apiFetchPaginated(`/minifigs/${e}/parts/`) || []).map(e => {
+        const t = await apiFetchPaginated(`/minifigs/${e}/parts/`);
+        return (t || []).map(e => {
             procPart(e.part);
             const t = String(e.color.id);
             return COLOR_MAP[t] || (COLOR_MAP[t] = {
@@ -709,7 +711,7 @@ async function fetchMinifigParts(e) {
             }
         })
     } catch (t) {
-        return console.error(`Failed to fetch parts for minifig ${e}:`, t), []
+        throw console.error(`Failed to fetch parts for minifig ${e}:`, t), t
     }
 }
 async function handleFeelingLucky() {
@@ -1574,6 +1576,28 @@ function renderSetInventory() {
         const t = e.set_num,
             o = S.minifigColl[t]?.qty || 0,
             l = e.name || "Загрузка...";
+        const n = e.isLoadingParts ? '<div class="flex items-center justify-center p-2"><div class="loader !w-5 !h-5"></div></div>' : e.loadingError ? `
+                        <div class="text-center p-2">
+                            <p class="text-xs text-red-400 mb-2">Не удалось загрузить детали.</p>
+                            <button data-action="retry-load-minifig-parts" data-fig-num="${t}" class="text-xs px-2 py-1 rounded-md bg-blue-600 hover:bg-blue-700 text-white transition-colors">
+                                Попробовать снова
+                            </button>
+                        </div>
+                    ` : (e.parts || []).map((e) => `
+                                <div class="flex items-center p-1.5 rounded-md gap-2 text-xs">
+                                    <div class="w-8 h-8 bg-white rounded flex items-center justify-center flex-shrink-0">
+                                        <img ${getPartImageUrl(e.part.part_img_url)} alt="${e.part.name}" class="w-full h-full object-contain p-0.5">
+                                    </div>
+                                    <div class="flex-grow truncate">
+                                        <p class="text-gray-200 truncate">${e.part.name}</p>
+                                        <p class="text-gray-400 truncate">${e.part.part_num}</p>
+                                    </div>
+                                    <div class="flex items-center gap-2 flex-shrink-0">
+                                        <span class="w-4 h-4 rounded-full border border-gray-500 ${e.color.isTransparent?"checkerboard":""}" style="background-color: ${e.color.hex};" title="${e.color.name}"></span>
+                                        <span class="text-gray-300 w-6 text-right">${e.quantity}x</span>
+                                    </div>
+                                </div>
+                            `).join("") || (e.parts && 0 === e.parts.length ? '<p class="text-xs text-gray-400 text-center p-2">Детали не найдены.</p>' : "");
         return `
                     <div class="bg-gray-700/50 rounded-lg overflow-hidden">
                         <div class="flex items-center p-2 gap-3 text-sm">
@@ -1606,26 +1630,12 @@ function renderSetInventory() {
                                     </button>
                                 </div>
                             `:""}
-                            ${e.isLoadingParts?'<div class="flex items-center justify-center p-2"><div class="loader !w-5 !h-5"></div></div>':(e.parts||[]).map((e) =>`
-                                    <div class="flex items-center p-1.5 rounded-md gap-2 text-xs">
-                                        <div class="w-8 h-8 bg-white rounded flex items-center justify-center flex-shrink-0">
-                                            <img ${getPartImageUrl(e.part.part_img_url)} alt="${e.part.name}" class="w-full h-full object-contain p-0.5">
-                                        </div>
-                                        <div class="flex-grow truncate">
-                                            <p class="text-gray-200 truncate">${e.part.name}</p>
-                                            <p class="text-gray-400 truncate">${e.part.part_num}</p>
-                                        </div>
-                                        <div class="flex items-center gap-2 flex-shrink-0">
-                                            <span class="w-4 h-4 rounded-full border border-gray-500 ${e.color.isTransparent?"checkerboard":""}" style="background-color: ${e.color.hex};" title="${e.color.name}"></span>
-                                            <span class="text-gray-300 w-6 text-right">${e.quantity}x</span>
-                                        </div>
-                                    </div>
-                                `).join("")||e.parts&&0===e.parts.length?'<p class="text-xs text-gray-400 text-center p-2">Детали не найдены.</p>':""}
+                            ${n}
                         </div>
                     </div>
                 `
     }).join(""));
-    const n = e.map(e => `
+    const r = e.map(e => `
             <div class="flex items-center bg-gray-700/50 p-2 rounded-md gap-3 text-sm">
                 <div class="w-12 h-12 bg-white rounded-md flex items-center justify-center flex-shrink-0">
                         <img ${getPartImageUrl(e.part.part_img_url)} alt="${e.part.name}" class="w-full h-full object-contain p-1">
@@ -1640,8 +1650,8 @@ function renderSetInventory() {
                 </div>
             </div>
         `).join("");
-    let r = "";
-    return t ? r = '<div class="flex justify-center p-4 flex-shrink-0"><div class="loader !w-8 !h-8"></div></div>' : o && (r = `<div class="pt-4 text-center flex-shrink-0">
+    let s = "";
+    return t ? s = '<div class="flex justify-center p-4 flex-shrink-0"><div class="loader !w-8 !h-8"></div></div>' : o && (s = `<div class="pt-4 text-center flex-shrink-0">
                 <button data-action="load-more-inventory" class="bg-blue-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-700 transition-colors">
                     Загрузить ещё
                 </button>
@@ -1659,8 +1669,8 @@ function renderSetInventory() {
                         ${I_Brick("w-5 h-5")} Детали
                     </h3>
                     ${e.length>0||t?`
-                        <div class="space-y-2">${n}</div>
-                        ${r}
+                        <div class="space-y-2">${r}</div>
+                        ${s}
                     `:'<div class="text-sm text-gray-400 p-2">Инвентарь (кроме минифигурок) не найден.</div>'}
                 </div>
             </div>
@@ -2915,18 +2925,28 @@ document.addEventListener("click", async e => {
                     const e = S.setModal.minifigs.find(e => e.set_num === a);
                     if (e) {
                         e.isExpanded = !e.isExpanded;
-                        if (e.isExpanded && !e.parts) {
-                            e.isLoadingParts = true;
-                            renderSetModal(!1);
-                            fetchMinifigParts(a).then(t => {
-                                e.parts = t;
-                                e.isLoadingParts = false;
-                                S.selSetNum && renderSetModal(!1);
-                            });
-                        } else {
-                            renderSetModal(!1);
-                        }
+                        if (e.isExpanded && !e.parts && !e.loadingError) {
+                            e.isLoadingParts = !0, renderSetModal(!1), fetchMinifigParts(a).then(t => {
+                                e.parts = t
+                            }).catch(() => {
+                                e.loadingError = !0
+                            }).finally(() => {
+                                e.isLoadingParts = !1, S.selSetNum && renderSetModal(!1)
+                            })
+                        } else e.isExpanded || (e.loadingError = !1), renderSetModal(!1)
                     }
+                }
+                break;
+            case "retry-load-minifig-parts":
+                if (a) {
+                    const e = S.setModal.minifigs.find(e => e.set_num === a);
+                    e && (e.loadingError = !1, e.isLoadingParts = !0, e.parts = null, renderSetModal(!1), fetchMinifigParts(a).then(t => {
+                        e.parts = t
+                    }).catch(() => {
+                        e.loadingError = !0
+                    }).finally(() => {
+                        e.isLoadingParts = !1, S.selSetNum && renderSetModal(!1)
+                    }))
                 }
                 break;
             case "add-minifig-to-collection":
