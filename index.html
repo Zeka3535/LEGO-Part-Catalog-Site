@@ -19,6 +19,7 @@
   <meta property="og:type" content="website">
 
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <style>
     body{font-family:sans-serif}.no-scrollbar::-webkit-scrollbar{display:none}.no-scrollbar{-ms-overflow-style:none;scrollbar-width:none}#search-input::-webkit-search-cancel-button{-webkit-appearance:none;appearance:none;display:none}.checkerboard{background-image:linear-gradient(45deg,#374151 25%,transparent 25%),linear-gradient(-45deg,#374151 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#374151 75%),linear-gradient(-45deg,transparent 75%,#374151 75%);background-size:8px 8px;background-position:0 0,0 4px,4px -4px,-4px 0}.modal-hidden{display:none!important}.viewer-hidden{display:none!important}.loader{border:4px solid #4a5568;border-top:4px solid #4299e1;border-radius:50%;width:48px;height:48px;animation:spin 1s linear infinite}@keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}@keyframes fadeIn{from{opacity:0}to{opacity:1}}@keyframes fadeOut{from{opacity:1}to{opacity:0}}@keyframes scaleIn{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}@keyframes scaleOut{from{opacity:1;transform:scale(1)}to{opacity:0;transform:scale(.95)}}@keyframes fadeInUp{from{opacity:0;transform:translateY(1rem)}to{opacity:1;transform:translateY(0)}}#modal-container,#filter-modal-container,#set-modal-container,#settings-modal-container,#minifig-modal-container,#image-viewer-container{opacity:0;transition:opacity .2s ease-out}#modal-container.visible,#filter-modal-container.visible,#set-modal-container.visible,#settings-modal-container.visible,#minifig-modal-container.visible,#image-viewer-container.visible{opacity:1}.modal-content-enter{animation:scaleIn .2s ease-out forwards}.modal-content-leave{animation:scaleOut .2s ease-out forwards}.part-card.animate-in,.set-card.animate-in,.minifig-card.animate-in{opacity:0;animation:fadeInUp .4s ease-out forwards}#color-selector-wrapper{transition:max-height .35s ease-in-out;overflow:hidden}#image-viewer-container img{transform:scale(.95);opacity:0;transition:transform .2s ease-out,opacity .2s ease-out}#image-viewer-container.visible img{transform:scale(1);opacity:1}
   </style>
@@ -53,6 +54,7 @@ function getApiKey() {
     currentApiKeyIndex = (currentApiKeyIndex + 1) % REBRICKABLE_API_KEYS.length;
     return key;
 }
+const CACHE_NAME = 'lego-catalog-cache-v1';
 const COLOR_COLLAPSE_THRESHOLD = 18;
 let COLOR_MAP = {},
     PART_MAP = {},
@@ -2071,13 +2073,13 @@ function renderSettingsModal() {
                         <h3 class="text-md font-semibold text-gray-300 mb-2">Импорт / Экспорт</h3>
                          ${t?`<div id="import-export-status" class="mb-2 p-2 text-sm rounded-md ${c}">${t}</div>`:'<div id="import-export-status" class="mb-2"></div>'}
                         <div class="bg-gray-900/50 rounded-lg p-3 space-y-3">
-                            <p class="text-xs text-gray-400">Сохраните вашу коллекцию в CSV файл или загрузите ее из ранее сохраненного файла. Импорт объединит данные с вашей текущей коллекцией.</p>
+                            <p class="text-xs text-gray-400">Сохраните вашу коллекцию и кеш (изображения, данные) в .zip файл или загрузите их. Импорт объединит данные с вашей текущей коллекцией.</p>
                             <div class="flex gap-3">
-                                <button data-action="import-csv" class="w-full flex items-center justify-center px-3 py-2 text-sm font-semibold rounded-md transition-colors duration-150 bg-blue-600 hover:bg-blue-700 text-white">
-                                    ${I_Up("w-5 h-5 mr-2")} Импорт из CSV
+                                <button data-action="import-zip" class="w-full flex items-center justify-center px-3 py-2 text-sm font-semibold rounded-md transition-colors duration-150 bg-blue-600 hover:bg-blue-700 text-white">
+                                    ${I_Up("w-5 h-5 mr-2")} Импорт (.zip)
                                 </button>
-                                <button data-action="export-csv" class="w-full flex items-center justify-center px-3 py-2 text-sm font-semibold rounded-md transition-colors duration-150 bg-green-600 hover:bg-green-700 text-white">
-                                    ${I_Down("w-5 h-5 mr-2")} Экспорт в CSV
+                                <button data-action="export-zip" class="w-full flex items-center justify-center px-3 py-2 text-sm font-semibold rounded-md transition-colors duration-150 bg-green-600 hover:bg-green-700 text-white">
+                                    ${I_Down("w-5 h-5 mr-2")} Экспорт (.zip)
                                 </button>
                             </div>
                         </div>
@@ -2335,7 +2337,7 @@ function updateUI() {
     e ? S.sidebarOpen ? (sidebarEl.classList.remove("-translate-x-full"), backdropEl.classList.remove("hidden"), document.body.style.overflow = "hidden") : (sidebarEl.classList.add("-translate-x-full"), backdropEl.classList.add("hidden"), document.body.style.overflow = "") : (sidebarEl.classList.remove("-translate-x-full"), backdropEl.classList.add("hidden"), document.body.style.overflow = "")
 }
 
-function exportCollectionToCSV() {
+function generateCsvData() {
     const t = (t) => {
         if (null == t) return "";
         const o = String(t);
@@ -2379,132 +2381,206 @@ function exportCollectionToCSV() {
             t(minifig?.num_parts)
         ].join(",") + "\n";
     }
-    const l = new Blob([o], {
-            type: "text/csv;charset=utf-8;"
-        }),
-        a = document.createElement("a"),
-        i = URL.createObjectURL(l);
-    a.setAttribute("href", i), a.setAttribute("download", `lego-collection-${(new Date).toISOString().slice(0,10)}.csv`), a.style.visibility = "hidden", document.body.appendChild(a), a.click(), document.body.removeChild(a), URL.revokeObjectURL(i)
+    return o;
 }
-async function importCollectionFromCSV(e) {
-    S.settingsModal.status = "Импорт файла...", S.settingsModal.statusType = "info", renderSettingsModal();
-    const t = (e, t) => {
-            S.settingsModal.status = e, S.settingsModal.statusType = t, renderSettingsModal(), "error" !== t && setTimeout(() => {
-                S.settingsOpen && S.settingsModal.status === e && (S.settingsModal.status = "", renderSettingsModal())
-            }, 3e3)
-        },
-        o = new FileReader;
-    o.onload = async o => {
-        try {
-            const content = o.target.result;
-            if (typeof content !== 'string') {
-                throw new Error("Не удалось прочитать файл как текст.");
+async function exportCollectionAndCacheToZip() {
+    S.settingsModal.status = "Подготовка данных...", S.settingsModal.statusType = "info", renderSettingsModal();
+    try {
+        const zip = new JSZip();
+        S.settingsModal.status = "Экспорт коллекции в CSV...", renderSettingsModal();
+        const csvData = generateCsvData();
+        zip.file("collection.csv", csvData);
+        S.settingsModal.status = "Чтение данных из кеша...", renderSettingsModal();
+        const cache = await caches.open(CACHE_NAME);
+        const requests = await cache.keys();
+        const manifest = [];
+        const cacheFolder = zip.folder("cache_data");
+        for (let i = 0; i < requests.length; i++) {
+            const request = requests[i];
+            const response = await cache.match(request);
+            if (response && response.ok) {
+                const blob = await response.blob();
+                const headers = {};
+                response.headers.forEach((value, key) => {
+                    headers[key] = value;
+                });
+                const filePath = `cache_data/r_${i}`;
+                cacheFolder.file(`r_${i}`, blob);
+                manifest.push({
+                    url: request.url,
+                    path: filePath,
+                    headers: headers
+                });
             }
-            const l = content.split(/\r?\n/).filter(e => "" !== e.trim());
-            if (l.length < 2) throw new Error("CSV файл пуст или содержит только заголовки.");
-            const a = parseCsvLine(l[0]).map(e => e.trim().replace(/"/g, "")),
-                i = ["type", "id", "quantity"];
-            if (!i.every(e => a.includes(e))) throw new Error(`Неверные заголовки в CSV. Обязательные: ${i.join(", ")}.`);
-            let n = {
-                parts: 0,
-                sets: 0,
-                minifigs: 0
-            };
-            for (let e = 1; e < l.length; e++) {
-                const csvRow = parseCsvLine(l[e]),
-                    row = a.reduce((acc, header, index) => {
-                        acc[header] = csvRow[index] ? csvRow[index].trim() : "";
-                        return acc;
-                    }, {});
-                const {
-                    type,
-                    id,
-                    quantity
-                } = row, qty = parseInt(quantity, 10);
-                if (!type || !id || isNaN(qty) || qty <= 0) {
-                    console.warn(`Пропуск некорректной строки ${e+1}:`, l[e]);
-                    continue
-                }
-                switch (type) {
-                    case "part":
-                        {
-                            const {
-                                color_id,
-                                name,
-                                part_cat_id,
-                                color_name
-                            } = row;
-                            if (!color_id) continue;
-                            S.coll[id] || (S.coll[id] = {});
-                            S.coll[id][color_id] = (S.coll[id][color_id] || 0) + qty;
-                            if (name && !PART_MAP[id]) {
-                                PART_MAP[id] = {
-                                    id: id,
-                                    part_num: id,
-                                    name: name,
-                                    categoryId: part_cat_id ? parseInt(part_cat_id, 10) : null
-                                };
-                            }
-                            if (color_name && !COLOR_MAP[color_id]) {
-                                COLOR_MAP[color_id] = {
-                                    id: color_id,
-                                    name: color_name
-                                };
-                            }
-                            n.parts++;
-                            break;
-                        }
-                    case "set":
-                        {
-                            const {
-                                name,
-                                set_theme_id,
-                                set_year,
-                                set_num_parts
-                            } = row;
-                            S.setColl[id] = {
-                                qty: (S.setColl[id]?.qty || 0) + qty
-                            };
-                            if (name && !SET_MAP[id]) {
-                                SET_MAP[id] = {
-                                    set_num: id,
-                                    name: name,
-                                    theme_id: set_theme_id ? parseInt(set_theme_id, 10) : null,
-                                    year: set_year ? parseInt(set_year, 10) : null,
-                                    num_parts: set_num_parts ? parseInt(set_num_parts, 10) : null
-                                };
-                            }
-                            n.sets++;
-                            break;
-                        }
-                    case "minifig":
-                        {
-                            const {
-                                name,
-                                minifig_num_parts
-                            } = row;
-                            S.minifigColl[id] = {
-                                qty: (S.minifigColl[id]?.qty || 0) + qty
-                            };
-                            if (name && !MINIFIG_MAP[id]) {
-                                MINIFIG_MAP[id] = {
-                                    set_num: id,
-                                    name: name,
-                                    num_parts: minifig_num_parts ? parseInt(minifig_num_parts, 10) : null
-                                };
-                            }
-                            n.minifigs++;
-                            break;
-                        }
-                }
-            }
-            saveState(), t("Загрузка недостающих данных...", "info"), await Promise.all([fetchMissingCollectionPartDetails(), fetchMissingCollectionSetDetails(), fetchMissingCollectionMinifigDetails()]), await fetchColorDetailsForCollectionParts(), t(`Импорт завершен. Добавлено: ${n.parts} деталей, ${n.sets} наборов, ${n.minifigs} минифигурок.`, "success"), S.gridStale = !0, updateUI()
-        } catch (e) {
-            console.error("CSV Import failed:", e), t(`Ошибка импорта: ${e.message}`, "error")
         }
-    }, o.onerror = () => {
-        t("Не удалось прочитать файл.", "error")
-    }, o.readAsText(e)
+        zip.file("cache_manifest.json", JSON.stringify(manifest));
+        S.settingsModal.status = `Создание ZIP архива... (Найдено ${manifest.length} записей в кеше)`, renderSettingsModal();
+        const zipBlob = await zip.generateAsync({
+            type: "blob"
+        });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(zipBlob);
+        link.download = `lego-collection-backup-${new Date().toISOString().slice(0, 10)}.zip`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(link.href);
+        S.settingsModal.status = "Экспорт успешно завершен!", S.settingsModal.statusType = "success";
+        renderSettingsModal();
+    } catch (e) {
+        console.error("ZIP Export failed:", e);
+        S.settingsModal.status = `Ошибка экспорта: ${e.message}`, S.settingsModal.statusType = "error";
+        renderSettingsModal();
+    }
+}
+async function processCsvData(content) {
+    const t = (e, t) => {
+        S.settingsModal.status = e, S.settingsModal.statusType = t, renderSettingsModal();
+        "error" !== t && setTimeout(() => {
+            S.settingsOpen && S.settingsModal.status === e && (S.settingsModal.status = "", renderSettingsModal())
+        }, 3e3)
+    };
+    try {
+        const l = content.split(/\r?\n/).filter(e => "" !== e.trim());
+        if (l.length < 2) throw new Error("CSV файл пуст или содержит только заголовки.");
+        const a = parseCsvLine(l[0]).map(e => e.trim().replace(/"/g, "")),
+            i = ["type", "id", "quantity"];
+        if (!i.every(e => a.includes(e))) throw new Error(`Неверные заголовки в CSV. Обязательные: ${i.join(", ")}.`);
+        let n = {
+            parts: 0,
+            sets: 0,
+            minifigs: 0
+        };
+        for (let e = 1; e < l.length; e++) {
+            const csvRow = parseCsvLine(l[e]),
+                row = a.reduce((acc, header, index) => {
+                    acc[header] = csvRow[index] ? csvRow[index].trim() : "";
+                    return acc;
+                }, {});
+            const {
+                type,
+                id,
+                quantity
+            } = row, qty = parseInt(quantity, 10);
+            if (!type || !id || isNaN(qty) || qty <= 0) {
+                console.warn(`Пропуск некорректной строки ${e+1}:`, l[e]);
+                continue
+            }
+            switch (type) {
+                case "part":
+                    {
+                        const {
+                            color_id,
+                            name,
+                            part_cat_id,
+                            color_name
+                        } = row;
+                        if (!color_id) continue;
+                        S.coll[id] || (S.coll[id] = {});
+                        S.coll[id][color_id] = (S.coll[id][color_id] || 0) + qty;
+                        if (name && !PART_MAP[id]) {
+                            PART_MAP[id] = {
+                                id: id,
+                                part_num: id,
+                                name: name,
+                                categoryId: part_cat_id ? parseInt(part_cat_id, 10) : null
+                            };
+                        }
+                        if (color_name && !COLOR_MAP[color_id]) {
+                            COLOR_MAP[color_id] = {
+                                id: color_id,
+                                name: color_name
+                            };
+                        }
+                        n.parts++;
+                        break;
+                    }
+                case "set":
+                    {
+                        const {
+                            name,
+                            set_theme_id,
+                            set_year,
+                            set_num_parts
+                        } = row;
+                        S.setColl[id] = {
+                            qty: (S.setColl[id]?.qty || 0) + qty
+                        };
+                        if (name && !SET_MAP[id]) {
+                            SET_MAP[id] = {
+                                set_num: id,
+                                name: name,
+                                theme_id: set_theme_id ? parseInt(set_theme_id, 10) : null,
+                                year: set_year ? parseInt(set_year, 10) : null,
+                                num_parts: set_num_parts ? parseInt(set_num_parts, 10) : null
+                            };
+                        }
+                        n.sets++;
+                        break;
+                    }
+                case "minifig":
+                    {
+                        const {
+                            name,
+                            minifig_num_parts
+                        } = row;
+                        S.minifigColl[id] = {
+                            qty: (S.minifigColl[id]?.qty || 0) + qty
+                        };
+                        if (name && !MINIFIG_MAP[id]) {
+                            MINIFIG_MAP[id] = {
+                                set_num: id,
+                                name: name,
+                                num_parts: minifig_num_parts ? parseInt(minifig_num_parts, 10) : null
+                            };
+                        }
+                        n.minifigs++;
+                        break;
+                    }
+            }
+        }
+        saveState(), t(`Импорт CSV завершен. Добавлено: ${n.parts} деталей, ${n.sets} наборов, ${n.minifigs} минифигурок.`, "success")
+    } catch (e) {
+        console.error("CSV Import failed:", e), t(`Ошибка импорта CSV: ${e.message}`, "error");
+        throw e;
+    }
+}
+async function importCollectionAndCacheFromZip(file) {
+    S.settingsModal.status = "Чтение ZIP архива...", S.settingsModal.statusType = "info", renderSettingsModal();
+    try {
+        const zip = await JSZip.loadAsync(file);
+        const csvFile = zip.file("collection.csv");
+        if (csvFile) {
+            S.settingsModal.status = "Импорт коллекции из CSV...", renderSettingsModal();
+            const csvContent = await csvFile.async("string");
+            await processCsvData(csvContent);
+        }
+        const manifestFile = zip.file("cache_manifest.json");
+        if (manifestFile) {
+            S.settingsModal.status = "Импорт кеша...", renderSettingsModal();
+            const manifest = JSON.parse(await manifestFile.async("string"));
+            const cache = await caches.open(CACHE_NAME);
+            let importedCount = 0;
+            for (const entry of manifest) {
+                const dataFile = zip.file(entry.path);
+                if (dataFile) {
+                    const blob = await dataFile.async('blob');
+                    const response = new Response(blob, {
+                        headers: entry.headers
+                    });
+                    await cache.put(entry.url, response);
+                    importedCount++;
+                }
+            }
+            S.settingsModal.status = `Импорт кеша завершен. Загружено ${importedCount} записей.`, S.settingsModal.statusType = "success";
+            renderSettingsModal();
+        }
+        S.settingsModal.status = "Импорт завершен. Обновление данных...", S.settingsModal.statusType = "success", renderSettingsModal(), await Promise.all([fetchMissingCollectionPartDetails(), fetchMissingCollectionSetDetails(), fetchMissingCollectionMinifigDetails()]), await fetchColorDetailsForCollectionParts(), S.settingsModal.status = "Данные обновлены.", S.gridStale = !0, updateUI()
+    } catch (e) {
+        console.error("ZIP Import failed:", e);
+        S.settingsModal.status = `Ошибка импорта ZIP: ${e.message}`, S.settingsModal.statusType = "error";
+        renderSettingsModal();
+    }
 }
 async function handleUpdateCollection(e, t, o) {
     S.coll[e] || (S.coll[e] = {});
@@ -2644,9 +2720,7 @@ async function handleBulkAddMinifigParts(e) {
             const t = e.part.part_num,
                 o = String(e.color.id),
                 a = e.quantity * l;
-            S.coll[t] || (S.coll[t] = {});
-            const i = S.coll[t][o] || 0;
-            S.coll[t][o] = i + a
+            S.coll[t] || (S.coll[t] = {}), S.coll[t][o] = (S.coll[t][o] || 0) + a
         }), saveState(), await Promise.all([fetchMissingCollectionPartDetails(), fetchColorDetailsForCollectionParts()]);
         const a = `Детали из "${t.name}" (${o.length} видов) добавлены.`;
         S.setModal.status = a, S.setModal.statusType = "success", setTimeout(() => {
@@ -3091,11 +3165,12 @@ document.addEventListener("click", async e => {
             case "confirm-delete-minifigs":
                 S.minifigColl = {}, saveState(), S.settingsModal.delConfirm = null, renderSettingsModal(), updateUI();
                 break;
-            case "export-csv":
-                exportCollectionToCSV();
+            case "export-zip":
+                exportCollectionAndCacheToZip();
                 break;
-            case "import-csv":
-                document.getElementById("import-csv-input")?.click()
+            case "import-zip":
+                document.getElementById("import-zip-input")?.click();
+                break;
         }
     } else if (minifigModalEl?.contains(t)) {
         const e = t.closest("[data-action]");
@@ -3332,9 +3407,9 @@ document.addEventListener("click", async e => {
             tempFilters.setFilters[t.dataset.filterKey] = t.value;
         }
         updateFilterModalUI();
-    } else if ("import-csv-input" === t.id) {
+    } else if ("import-zip-input" === t.id) {
         const o = t.files?.[0];
-        o && importCollectionFromCSV(o);
+        o && importCollectionAndCacheFromZip(o);
         t.value = ""
     }
 }), document.addEventListener("keydown", e => {
@@ -3393,8 +3468,8 @@ document.addEventListener("DOMContentLoaded", () => {
     viewerCloseBtn.innerHTML = I_X("w-6 h-6");
     const importInput = document.createElement('input');
     importInput.type = 'file';
-    importInput.id = 'import-csv-input';
-    importInput.accept = '.csv';
+    importInput.id = 'import-zip-input';
+    importInput.accept = '.zip';
     importInput.style.display = 'none';
     document.body.appendChild(importInput);
     initializeApp();
