@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -47,7 +46,7 @@
   </button>
   <script type="module">
 const REBRICKABLE_API_URL = 'https://rebrickable.com/api/v3/lego';
-const REBRICKABLE_API_KEYS = ['20c78cc607d6059c8d2a61338d851590', '04a7405ad41f1dd484a562f6e0c57312', 'd93f5c0989f63afa9b1c29ef8ad66002'];
+const REBRICKABLE_API_KEYS = ['20c78cc607d6059c8d2a61338d851590', '04a7405ad41f1dd484a562f6e0c57312', 'd93f5c0989f63afa9b1c29ef8ad66002', 'b4179c1b8bd3c022ec9fc0e713e96b77', 'd32527bc33b575b8825a0ba04ba4add5'];
 let currentApiKeyIndex = 0;
 
 function getApiKey() {
@@ -793,7 +792,7 @@ async function handleFeelingLucky() {
 
 function getPartImageUrl(e) {
     const t = `data:image/svg+xml,${encodeURIComponent(I_Img("w-full h-full text-gray-500"))}`;
-    return e ? `src="${e}" onerror="this.onerror=null; this.src='${t}';"` : `src="${t}"`;
+    return e ? `src="${e}" onerror="this.onerror=null; this.src='${t}';"` : `src="${t}"`
 }
 
 function sortColorIds(e, t) {
@@ -2136,19 +2135,14 @@ function renderSettingsModal() {
                         <h3 class="text-md font-semibold text-gray-300 mb-2">Импорт / Экспорт</h3>
                          ${t?`<div id="import-export-status" class="mb-2 p-2 text-sm rounded-md ${c}">${t}</div>`:'<div id="import-export-status" class="mb-2"></div>'}
                         <div class="bg-gray-900/50 rounded-lg p-3 space-y-3">
-                            <p class="text-xs text-gray-400">Сохраните вашу коллекцию в CSV-файл или создайте полную резервную копию (коллекция + кеш изображений) в ZIP-архив. Импорт ZIP-файла объединит данные с вашей текущей коллекцией.</p>
-                            <div class="space-y-3">
+                            <p class="text-xs text-gray-400">Сохраните вашу коллекцию и кеш (изображения, данные) в .zip файл или загрузите их. Импорт объединит данные с вашей текущей коллекцией.</p>
+                            <div class="flex gap-3">
                                 <button data-action="import-zip" class="w-full flex items-center justify-center px-3 py-2 text-sm font-semibold rounded-md transition-colors duration-150 bg-blue-600 hover:bg-blue-700 text-white">
                                     ${I_Up("w-5 h-5 mr-2")} Импорт (.zip)
                                 </button>
-                                <div class="grid grid-cols-2 gap-3">
-                                    <button data-action="export-csv" class="w-full flex items-center justify-center px-3 py-2 text-sm font-semibold rounded-md transition-colors duration-150 bg-green-600 hover:bg-green-700 text-white">
-                                        ${I_Down("w-5 h-5 mr-2")} Экспорт CSV
-                                    </button>
-                                    <button data-action="export-zip" class="w-full flex items-center justify-center px-3 py-2 text-sm font-semibold rounded-md transition-colors duration-150 bg-teal-600 hover:bg-teal-700 text-white">
-                                        ${I_Down("w-5 h-5 mr-2")} Экспорт с кешем
-                                    </button>
-                                </div>
+                                <button data-action="export-zip" class="w-full flex items-center justify-center px-3 py-2 text-sm font-semibold rounded-md transition-colors duration-150 bg-green-600 hover:bg-green-700 text-white">
+                                    ${I_Down("w-5 h-5 mr-2")} Экспорт (.zip)
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -2407,42 +2401,29 @@ function updateUI() {
 
 async function ensureUrlsAreCached(urls, progressCallback) {
     const cache = await caches.open(CACHE_NAME);
-    const uniqueUrls = [...new Set(urls.filter(Boolean))];
-    const urlsToCache = [];
+    const requests = await cache.keys();
+    const cachedUrls = new Set(requests.map(req => req.url));
+    const urlsToCache = [...new Set(urls.filter(Boolean))].filter(url => !cachedUrls.has(url));
 
-    const checkPromises = uniqueUrls.map(async url => {
-        const response = await cache.match(url);
-        if (!response || !response.ok) { // Опаке-ответы не являются "ok", поэтому их нужно перезагрузить
-            urlsToCache.push(url);
-        }
-    });
-    await Promise.all(checkPromises);
-    
-    if (urlsToCache.length === 0) {
-        progressCallback?.('Все изображения уже кэшированы.');
-        return;
-    }
+    if (urlsToCache.length === 0) return;
 
-    progressCallback?.(`Кэширование ${urlsToCache.length} изображений...`);
+    progressCallback?.(`Кэширование ${urlsToCache.length} новых изображений...`);
 
-    let cachedCount = 0;
-    for (let i = 0; i < urlsToCache.length; i += 10) {
-        const batch = urlsToCache.slice(i, i + 10);
+    for (let i = 0; i < urlsToCache.length; i += 5) { 
+        const batch = urlsToCache.slice(i, i + 5);
         await Promise.all(batch.map(async (url) => {
             try {
-                // Используем CORS-запрос, чтобы получить ответ, который можно будет прочитать позже
-                const response = await fetch(url, { mode: 'cors' });
-                if (response.ok) {
-                    await cache.put(url, response.clone());
-                } else {
-                     console.warn(`Не удалось кэшировать ${url}, статус: ${response.status}`);
-                }
+                
+                const response = await fetch(url, {
+                    mode: 'no-cors'
+                });
+                
+                await cache.put(url, response);
             } catch (e) {
-                console.warn(`Ошибка кэширования URL: ${url}`, e);
+                console.warn(`Failed to cache URL: ${url}`, e);
             }
         }));
-        cachedCount += batch.length;
-        progressCallback?.(`Кэширование изображений... (${cachedCount}/${urlsToCache.length})`);
+        progressCallback?.(`Кэширование изображений... (${i + batch.length}/${urlsToCache.length})`);
     }
 }
 
@@ -2492,107 +2473,130 @@ function generateCsvData() {
     }
     return o;
 }
-async function exportCollectionCsv() {
-    updateSettingsStatus("Создание ZIP с CSV файлом...", 'info');
-    try {
-        const csvData = generateCsvData();
-        const zip = new JSZip();
-        zip.file("collection.csv", csvData);
-        
-        const zipBlob = await zip.generateAsync({ type: "blob" }, (metadata) => {
-             if (metadata.percent) {
-                updateSettingsStatus(`Создание ZIP архива... ${Math.floor(metadata.percent)}%`, 'info');
-            }
-        });
-
-        const link = document.createElement("a");
-        link.href = URL.createObjectURL(zipBlob);
-        link.download = `lego-collection-${new Date().toISOString().slice(0, 10)}.zip`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(link.href);
-
-        updateSettingsStatus("Экспорт CSV успешно завершен!", "success", 5000);
-    } catch (e) {
-        console.error("CSV Export failed:", e);
-        updateSettingsStatus(`Ошибка экспорта CSV: ${e.message}`, "error");
-    }
-}
 async function exportCollectionAndCacheToZip() {
     const setStatus = (status, type) => updateSettingsStatus(status, type, 0);
 
     try {
-        setStatus("Начало экспорта с кешем...", 'info');
+        setStatus("Начало полного экспорта. Это может занять несколько минут...", 'info');
         await new Promise(r => setTimeout(r, 100)); 
 
-        const zip = new JSZip();
+        
+        setStatus("Сбор данных о коллекции...", 'info');
+        const setsToProcess = new Set(Object.keys(S.setColl));
+        const minifigsToProcess = new Set(Object.keys(S.minifigColl));
+        const partsToProcess = new Set();
+        Object.keys(S.coll).forEach(p => partsToProcess.add(p));
 
-        setStatus("Экспорт данных коллекции в CSV...", 'info');
-        const csvData = generateCsvData();
-        zip.file("collection.csv", csvData);
+        
+        let processedCount = 0;
+        const totalSets = setsToProcess.size;
+        for (const setNum of setsToProcess) {
+            processedCount++;
+            setStatus(`Обработка наборов: ${processedCount}/${totalSets} (${setNum})`, 'info');
 
+            if (!SET_MAP[setNum]?.name) await fetchMissingCollectionSetDetails();
+
+            const inventory = await fetchAllSetInventory(setNum);
+            inventory.forEach(item => partsToProcess.add(item.part.part_num));
+
+            const setMinifigs = await apiFetchPaginated(`/sets/${setNum}/minifigs/`);
+            setMinifigs.forEach(fig => minifigsToProcess.add(fig.set_num));
+            await new Promise(r => setTimeout(r, 500)); 
+        }
+
+        
+        processedCount = 0;
+        const totalMinifigs = minifigsToProcess.size;
+        for (const figNum of minifigsToProcess) {
+            processedCount++;
+            setStatus(`Обработка минифигурок: ${processedCount}/${totalMinifigs} (${figNum})`, 'info');
+
+            if (!MINIFIG_MAP[figNum]?.name) await fetchMinifigDetails(figNum);
+
+            const parts = await fetchMinifigParts(figNum);
+            parts.forEach(item => partsToProcess.add(item.part.part_num));
+            await new Promise(r => setTimeout(r, 500)); 
+        }
+
+        
+        const allParts = [...partsToProcess];
+        const missingPartDetails = allParts.filter(p => !PART_MAP[p]?.name);
+        if (missingPartDetails.length > 0) {
+            for (let i = 0; i < missingPartDetails.length; i += 100) {
+                setStatus(`Загрузка данных о деталях... (${i}/${missingPartDetails.length})`, 'info');
+                const batch = missingPartDetails.slice(i, i + 100);
+                try {
+                    (await apiFetchPaginated(`/parts/?part_nums=${batch.join(",")}`)).map(procPart);
+                } catch (e) {
+                    console.error("Error fetching part details batch", e);
+                }
+                await new Promise(r => setTimeout(r, 500));
+            }
+        }
+
+        processedCount = 0;
+        for (const partNum of allParts) {
+            processedCount++;
+            setStatus(`Загрузка данных о цветах деталей: ${processedCount}/${allParts.length} (${partNum})`, 'info');
+            if (!PART_MAP[partNum] || !PART_MAP[partNum].colorImages) {
+                await fetchColorDetailsForPart(partNum);
+                await new Promise(r => setTimeout(r, 200)); 
+            }
+        }
+
+        
         setStatus("Сбор URL-адресов изображений...", 'info');
         const imageUrls = new Set();
-        Object.keys(S.coll).forEach(partNum => {
+        setsToProcess.forEach(setNum => SET_MAP[setNum]?.set_img_url && imageUrls.add(SET_MAP[setNum].set_img_url));
+        minifigsToProcess.forEach(figNum => MINIFIG_MAP[figNum]?.set_img_url && imageUrls.add(MINIFIG_MAP[figNum].set_img_url));
+        allParts.forEach(partNum => {
             const part = PART_MAP[partNum];
             if (part) {
-                if (part.rebrickable_img_url) imageUrls.add(part.rebrickable_img_url);
+                if (part.part_img_url) imageUrls.add(part.part_img_url);
                 if (part.colorImages) {
-                   Object.keys(S.coll[partNum]).forEach(colorId => {
-                       if(part.colorImages[colorId]) imageUrls.add(part.colorImages[colorId]);
-                   });
+                    Object.values(part.colorImages).forEach(url => imageUrls.add(url));
                 }
             }
         });
-        Object.keys(S.setColl).forEach(setNum => SET_MAP[setNum]?.set_img_url && imageUrls.add(SET_MAP[setNum].set_img_url));
-        Object.keys(S.minifigColl).forEach(figNum => MINIFIG_MAP[figNum]?.set_img_url && imageUrls.add(MINIFIG_MAP[figNum].set_img_url));
 
+        
         await ensureUrlsAreCached([...imageUrls], (msg) => setStatus(msg, 'info'));
 
-        setStatus("Чтение изображений из кеша...", 'info');
+        
+        setStatus("Экспорт коллекции в CSV...", 'info');
+        const zip = new JSZip();
+        const csvData = generateCsvData();
+        zip.file("collection.csv", csvData);
+
+        setStatus("Чтение данных из кеша...", 'info');
         const cache = await caches.open(CACHE_NAME);
+        const requests = await cache.keys();
         const manifest = [];
         const cacheFolder = zip.folder("cache_data");
 
-        const urlsToZip = [...imageUrls];
-        const processingPromises = [];
-        let completed = 0;
-        
-        const processUrl = async (url, index) => {
-            try {
-                const response = await cache.match(url);
-                if (response && response.ok) {
-                    const blob = await response.blob();
-                    if (blob.size > 0) {
-                        const headers = {};
-                        response.headers.forEach((value, key) => { headers[key] = value; });
-                        const filePath = `r_${index}`;
-                        cacheFolder.file(filePath, blob);
-                        manifest.push({ url: url, path: `cache_data/${filePath}`, headers: headers });
-                    }
-                }
-            } finally {
-                completed++;
-                if (completed % 10 === 0 || completed === urlsToZip.length) {
-                   setStatus(`Чтение изображений из кеша... (${completed}/${urlsToZip.length})`, 'info');
-                }
+        for (let i = 0; i < requests.length; i++) {
+            const request = requests[i];
+            const response = await cache.match(request);
+            if (response && (response.ok || response.type === 'opaque')) { 
+                const blob = await response.blob();
+                const headers = {};
+                response.headers.forEach((value, key) => {
+                    headers[key] = value;
+                });
+                const filePath = `r_${i}`;
+                cacheFolder.file(filePath, blob);
+                manifest.push({
+                    url: request.url,
+                    path: `cache_data/${filePath}`,
+                    headers: headers
+                });
             }
-        };
-        
-        for(let i=0; i<urlsToZip.length; i++){
-            processingPromises.push(processUrl(urlsToZip[i], i));
         }
-        
-        await Promise.all(processingPromises);
-        
         zip.file("cache_manifest.json", JSON.stringify(manifest));
 
-        setStatus(`Создание ZIP архива... (Найдено ${manifest.length} изображений)`, 'info');
-        const zipBlob = await zip.generateAsync({ type: "blob" }, (metadata) => {
-            if (metadata.percent) {
-                setStatus(`Создание ZIP архива... ${Math.floor(metadata.percent)}%`, 'info');
-            }
+        setStatus(`Создание ZIP архива... (Найдено ${manifest.length} записей в кеше)`, 'info');
+        const zipBlob = await zip.generateAsync({
+            type: "blob"
         });
 
         const link = document.createElement("a");
@@ -2834,628 +2838,797 @@ async function handleUpdateMinifigCollection(e, t, o = !0) {
 }
 async function handleBulkUpdatePartsFromSet(e, t) {
     if (S.setModal.bulkUpdate) return;
-    S.setModal.bulkUpdate = !0;
-    S.setModal.status = "";
-    S.setModal.statusType = "";
-    updateSetModalControlsState();
+    S.setModal.bulkUpdate = !0, S.setModal.status = "", S.setModal.statusType = "", updateSetModalControlsState();
     try {
-        const inventory = await fetchAllSetInventory(e) || [];
-        inventory.forEach(item => {
-            const { part, color, quantity } = item;
-            if (!S.coll[part.part_num]) S.coll[part.part_num] = {};
-            const colorId = String(color.id);
-            const currentQty = S.coll[part.part_num][colorId] || 0;
-            const newQty = "add" === t ? currentQty + quantity : currentQty - quantity;
-
-            if (newQty > 0) {
-                S.coll[part.part_num][colorId] = newQty;
-            } else {
-                delete S.coll[part.part_num][colorId];
-                if (Object.keys(S.coll[part.part_num]).length === 0) {
-                    delete S.coll[part.part_num];
-                }
-            }
+        (await fetchAllSetInventory(e) || []).forEach(e => {
+            const {
+                part: o,
+                color: l,
+                quantity: a
+            } = e;
+            S.coll[o.part_num] || (S.coll[o.part_num] = {});
+            const i = String(l.id),
+                n = S.coll[o.part_num][i] || 0;
+            "add" === t ? S.coll[o.part_num][i] = n + a : n - a > 0 ? (S.coll[o.part_num][i] = n - a) : (delete S.coll[o.part_num][i], 0 === Object.keys(S.coll[o.part_num]).length && delete S.coll[o.part_num])
         });
-        
-        const minifigsInSet = S.setModal.minifigs.length > 0 ? S.setModal.minifigs : await apiFetchPaginated(`/sets/${e}/minifigs/`);
-        for (const fig of minifigsInSet) {
-            const currentFigQty = S.minifigColl[fig.set_num]?.qty || 0;
-            const newFigQty = "add" === t ? currentFigQty + fig.quantity : currentFigQty - fig.quantity;
-            if (newFigQty > 0) {
-                S.minifigColl[fig.set_num] = { qty: newFigQty };
-            } else {
-                delete S.minifigColl[fig.set_num];
-            }
+        let o = 0,
+            l = 0,
+            a = 0,
+            i = 0;
+        const n = S.setModal.minifigs || await apiFetchPaginated(`/sets/${e}/minifigs/`);
+        for (let e = 0; e < n.length; e += 3) {
+            const r = n.slice(e, e + 3);
+            await Promise.all(r.map(async e => {
+                const n = e.set_num,
+                    r = e.quantity,
+                    s = S.minifigColl[n]?.qty || 0;
+                "add" === t ? (S.minifigColl[n] = {
+                    qty: s + r
+                }, o += r) : (s - r > 0 ? S.minifigColl[n] = {
+                    qty: s - r
+                } : delete S.minifigColl[n], a += r);
+                const fig = S.setModal.minifigs.find(f => f.set_num === n);
+                const c = fig?.parts || await fetchMinifigParts(n);
+                if (fig) fig.parts = c;
+                (c || []).forEach(e => {
+                    const o = e.part.part_num,
+                        a = String(e.color.id),
+                        n = e.quantity * r;
+                    S.coll[o] || (S.coll[o] = {});
+                    const s = S.coll[o][a] || 0;
+                    "add" === t ? S.coll[o][a] = s + n : s - n > 0 ? S.coll[o][a] = s - n : (delete S.coll[o][a], 0 === Object.keys(S.coll[o]).length && delete S.coll[o]), "add" === t ? l += n : i += n
+                })
+            })), e + 3 < n.length && await new Promise(e => setTimeout(e, 1e3))
         }
-        
-        saveState();
-        S.gridStale = true;
-        S.setModal.status = "add" === t ? "Все детали и минифигурки из набора добавлены в коллекцию." : "Все детали и минифигурки из набора удалены из коллекции.";
-        S.setModal.statusType = 'success';
-
-    } catch (error) {
-        console.error("Bulk update failed:", error);
-        S.setModal.status = `Ошибка: ${error.message}`;
-        S.setModal.statusType = 'error';
+        saveState(), await Promise.all([fetchMissingCollectionPartDetails(), fetchColorDetailsForCollectionParts(), fetchMissingCollectionMinifigDetails()]);
+        let r = "";
+        "add" === t ? (r = "Детали набора успешно добавлены.", o > 0 && (r += ` ${o} минифигурок и их детали (${l} шт.) также добавлены.`)) : (r = "Детали набора успешно удалены.", a > 0 && (r += ` Также удалены ${a} минифигурок и их детали (${i} шт.).`)), S.setModal.status = r, S.setModal.statusType = "success", setTimeout(() => {
+            S.selSetNum && S.setModal.status === r && (S.setModal.status = "", updateSetModalView())
+        }, 3e3), S.gridStale = !0, updateUI()
+    } catch (o) {
+        console.error(`Bulk ${t} failed for set ${e}:`, o), S.setModal.status = `Ошибка: не удалось ${"add"===t?"добавить":"удалить"} детали.`, S.setModal.statusType = "error"
     } finally {
-        S.setModal.bulkUpdate = false;
-        S.gridStale = true;
-        updateSetModalControlsState();
-        updateUI();
+        S.setModal.bulkUpdate = !1, S.selSetNum && updateSetModalView()
+    }
+}
+async function handleBulkAddMinifigParts(e) {
+    const t = S.setModal.minifigs.find(t => t.set_num === e);
+    if (!t || S.setModal.bulkUpdate) return;
+    S.setModal.bulkUpdate = !0, S.setModal.status = `Добавление деталей из "${t.name}"...`, S.setModal.statusType = "info", updateSetModalView();
+    try {
+        let o = t.parts;
+        o || (o = await fetchMinifigParts(e));
+        t.parts = o;
+        if (!o || 0 === o.length) throw new Error("Детали минифигурки не найдены.");
+        const l = t.quantity;
+        (o || []).forEach(e => {
+            const t = e.part.part_num,
+                o = String(e.color.id),
+                a = e.quantity * l;
+            S.coll[t] || (S.coll[t] = {}), S.coll[t][o] = (S.coll[t][o] || 0) + a
+        }), saveState(), await Promise.all([fetchMissingCollectionPartDetails(), fetchColorDetailsForCollectionParts()]);
+        const a = `Детали из "${t.name}" (${o.length} видов) добавлены.`;
+        S.setModal.status = a, S.setModal.statusType = "success", setTimeout(() => {
+            S.selSetNum && S.setModal.status === a && (S.setModal.status = "", updateSetModalView())
+        }, 3e3)
+    } catch (o) {
+        console.error("Error adding minifig parts:", o), S.setModal.status = "Ошибка при добавлении деталей.", S.setModal.statusType = "error"
+    } finally {
+        S.setModal.bulkUpdate = !1, S.selSetNum && updateSetModalView(), "collection" === S.view && "parts" === S.subView ? (S.gridStale = !0, updateUI()) : renderSidebar()
+    }
+}
+async function handleBulkAddMinifigPartsFromModal(e) {
+    const t = MINIFIG_MAP[e];
+    if (!t || S.minifigModal.bulkUpdate) return;
+    S.minifigModal.bulkUpdate = !0, S.minifigModal.status = `Добавление деталей из "${t.name}"...`, S.minifigModal.statusType = "info", updateMinifigModalView();
+    try {
+        const o = S.minifigModal.inv || await fetchMinifigParts(e);
+        S.minifigModal.inv = o;
+        if (!o || 0 === o.length) throw new Error("Детали минифигурки не найдены.");
+        (o || []).forEach(e => {
+            const t = e.part.part_num,
+                o = String(e.color.id),
+                l = e.quantity;
+            S.coll[t] || (S.coll[t] = {}), S.coll[t][o] = (S.coll[t][o] || 0) + l
+        }), saveState(), await Promise.all([fetchMissingCollectionPartDetails(), fetchColorDetailsForCollectionParts()]);
+        const l = `Детали из "${t.name}" (${o.length} видов) добавлены.`;
+        S.minifigModal.status = l, S.minifigModal.statusType = "success", setTimeout(() => {
+            S.selFigNum && S.minifigModal.status === l && (S.minifigModal.status = "", updateMinifigModalView())
+        }, 3e3)
+    } catch (o) {
+        console.error("Ошибка добавления деталей минифигурки:", o), S.minifigModal.status = "Ошибка при добавлении деталей.", S.minifigModal.statusType = "error"
+    } finally {
+        S.minifigModal.bulkUpdate = !1, S.selFigNum && updateMinifigModalView(), "collection" === S.view && "parts" === S.subView ? (S.gridStale = !0, updateUI()) : renderSidebar()
     }
 }
 
-
-function closeModal() {
-    if (!S.selPartId) return;
-    const e = document.getElementById("modal-content");
-    e?.classList.add("modal-content-leave"), partModalEl.classList.remove("visible"), setTimeout(() => {
-        partModalEl.classList.add("modal-hidden"), document.body.classList.remove("overflow-hidden"), S.selPartId = null
-    }, 200)
+function triggerSearch(e = !1) {
+    if (!e) {
+        if ("sets" === S.subView) {
+            S.sortBy = S.q ? "relevance" : "year_desc";
+            S.setFilters = {
+                minYear: "",
+                maxYear: "",
+                minParts: "",
+                maxParts: ""
+            };
+        } else if ("minifigs" === S.subView) {
+            S.sortBy = S.q ? "relevance" : "name_asc";
+        } else {
+            S.sortBy = S.q ? "relevance" : "popularity";
+            S.filters.colorIds = [];
+            S.filters.inCollectionOnly = !1;
+        }
+    }
+    S.gridStale = !0;
+    if ("collection" === S.view) {
+        S.selCollCatId = null;
+        S.selCollThemeId = null;
+        updateUI();
+    } else if ("sets" === S.subView) {
+        S.selThemeId = null;
+        fetchSets();
+    } else if ("minifigs" === S.subView) {
+        fetchMinifigs();
+    } else {
+        S.selCatId = null;
+        searchRebrickableParts(S.q.trim());
+    }
 }
 
-function closeSetModal() {
-    if (!S.selSetNum) return;
-    const e = document.getElementById("set-modal-content");
-    e?.classList.add("modal-content-leave"), setModalEl.classList.remove("visible"), setTimeout(() => {
-        setModalEl.classList.add("modal-hidden"), document.body.classList.remove("overflow-hidden"), S.selSetNum = null
-    }, 200)
-}
-
-function closeMinifigModal() {
-    if (!S.selFigNum) return;
-    const e = document.getElementById("minifig-modal-content");
-    e?.classList.add("modal-content-leave"), minifigModalEl.classList.remove("visible"), setTimeout(() => {
-        minifigModalEl.classList.add("modal-hidden"), document.body.classList.remove("overflow-hidden"), S.selFigNum = null
-    }, 200)
-}
-
-function closeFilterModal() {
-    if (!S.filterOpen) return;
-    const e = document.getElementById("filter-modal-content");
-    e?.classList.add("modal-content-leave"), filterModalEl.classList.remove("visible"), setTimeout(() => {
-        filterModalEl.classList.add("modal-hidden"), document.body.classList.remove("overflow-hidden"), S.filterOpen = !1
-    }, 200)
-}
-
-function closeSettingsModal() {
-    if (!S.settingsOpen) return;
-    const e = document.getElementById("settings-modal-content");
-    e?.classList.add("modal-content-leave"), settingsModalEl.classList.remove("visible"), setTimeout(() => {
-        settingsModalEl.classList.add("modal-hidden"), document.body.classList.remove("overflow-hidden"), S.settingsOpen = !1
-    }, 200)
+function openImageViewer(e) {
+    e && !e.includes("data:image/svg+xml") && (viewerImg.setAttribute("src", e), viewerEl.classList.remove("viewer-hidden"), document.body.classList.add("overflow-hidden"), requestAnimationFrame(() => {
+        viewerEl.classList.add("visible")
+    }))
 }
 
 function closeImageViewer() {
-    viewerEl.classList.remove("visible"), setTimeout(() => {
-        viewerEl.classList.add("viewer-hidden"), viewerImg.src = ""
-    }, 200)
+    viewerEl.classList.remove("visible"), viewerEl.addEventListener("transitionend", e => {
+        e.target === viewerEl && (viewerEl.classList.add("viewer-hidden"), viewerImg.setAttribute("src", ""), !S.selPartId && !S.selSetNum && !S.selFigNum && !S.filterOpen && !S.settingsOpen && document.body.classList.remove("overflow-hidden"))
+    }, {
+        once: !0
+    })
+}
+
+function closeModal() {
+    const e = document.getElementById("modal-content");
+    e && !partModalEl.classList.contains("modal-hidden") && (partModalEl.classList.remove("visible"), e.classList.add("modal-content-leave"), !S.selSetNum && !S.filterOpen && !S.settingsOpen && !S.selFigNum && viewerEl.classList.contains("viewer-hidden") && document.body.classList.remove("overflow-hidden"), e.addEventListener("animationend", () => {
+        e.classList.contains("modal-content-leave") && (S.selPartId = null, S.partModal = {
+            groupId: null,
+            variants: [],
+            selColorId: null,
+            qty: 1,
+            loadingColors: !1,
+            loadingImg: !1,
+            imgUrl: null
+        }, partModalEl.classList.add("modal-hidden"), partModalEl.innerHTML = "")
+    }, {
+        once: !0
+    }))
+}
+
+function closeSetModal() {
+    const e = document.getElementById("set-modal-content");
+    e && !setModalEl.classList.contains("modal-hidden") && (setModalEl.classList.remove("visible"), e.classList.add("modal-content-leave"), !S.selPartId && !S.filterOpen && !S.settingsOpen && !S.selFigNum && viewerEl.classList.contains("viewer-hidden") && document.body.classList.remove("overflow-hidden"), e.addEventListener("animationend", () => {
+        e.classList.contains("modal-content-leave") && (S.selSetNum = null, S.setModal = {
+            loading: !1,
+            inv: [],
+            invPage: 1,
+            hasNextInv: !1,
+            qty: 1,
+            bulkUpdate: !1,
+            status: "",
+            statusType: "",
+            view: "details",
+            minifigs: [],
+            loadingMinifigs: !1
+        }, setModalEl.classList.add("modal-hidden"), setModalEl.innerHTML = "")
+    }, {
+        once: !0
+    }))
+}
+
+function closeMinifigModal() {
+    const e = document.getElementById("minifig-modal-content");
+    e && !minifigModalEl.classList.contains("modal-hidden") && (minifigModalEl.classList.remove("visible"), e.classList.add("modal-content-leave"), !S.selPartId && !S.selSetNum && !S.filterOpen && !S.settingsOpen && viewerEl.classList.contains("viewer-hidden") && document.body.classList.remove("overflow-hidden"), e.addEventListener("animationend", () => {
+        e.classList.contains("modal-content-leave") && (S.selFigNum = null, S.minifigModal = {
+            loading: !1,
+            qty: 1,
+            view: 'details',
+            inv: null,
+            loadingInv: !1,
+            invError: !1,
+            bulkUpdate: !1,
+            status: '',
+            statusType: ''
+        }, minifigModalEl.classList.add("modal-hidden"), minifigModalEl.innerHTML = "")
+    }, {
+        once: !0
+    }))
+}
+
+function closeFilterModal() {
+    const e = document.getElementById("filter-modal-content");
+    e && !filterModalEl.classList.contains("modal-hidden") && (S.filterOpen = !1, filterModalEl.classList.remove("visible"), e.classList.add("modal-content-leave"), !S.selPartId && !S.selSetNum && !S.settingsOpen && !S.selFigNum && viewerEl.classList.contains("viewer-hidden") && document.body.classList.remove("overflow-hidden"), e.addEventListener("animationend", () => {
+        e.classList.contains("modal-content-leave") && (filterModalEl.classList.add("modal-hidden"), filterModalEl.innerHTML = "")
+    }, {
+        once: !0
+    }))
+}
+
+function closeSettingsModal() {
+    const e = document.getElementById("settings-modal-content");
+    e && !settingsModalEl.classList.contains("modal-hidden") && (S.settingsOpen = !1, settingsModalEl.classList.remove("visible"), e.classList.add("modal-content-leave"), !S.selPartId && !S.selSetNum && !S.filterOpen && !S.selFigNum && viewerEl.classList.contains("viewer-hidden") && document.body.classList.remove("overflow-hidden"), e.addEventListener("animationend", () => {
+        e.classList.contains("modal-content-leave") && (settingsModalEl.classList.add("modal-hidden"), settingsModalEl.innerHTML = "", S.settingsModal.delConfirm = null, S.settingsModal.status = "")
+    }, {
+        once: !0
+    }))
 }
 
 function openModalForPart(e, t, o) {
-    const l = S.coll[e] || {},
-        a = PART_MAP[e];
-    if (!a) return;
-    S.selPartId = e;
-    const i = a.availableColorIds || [];
-    const n = sortColorIds(Object.keys(l).length > 0 ? Object.keys(l) : i, e);
-    const r = n.length > 0 ? n[0] : null;
-    S.partModal = {
-        groupId: t,
-        variants: o || [],
-        selColorId: r,
-        qty: r && l[r] ? l[r] : 1,
-        loadingColors: !1,
-        loadingImg: !1,
-        imgUrl: a.rebrickable_img_url || null
-    }, renderModal(), !a.availableColorIds ? fetchPartColors(e) : r && fetchPartColorSpecifics(e, r)
+    const l = PART_MAP[e];
+    if (l) {
+        S.selPartId = e;
+        S.partModal = {
+            groupId: t,
+            variants: o,
+            selColorId: null,
+            qty: 1,
+            loadingColors: !1,
+            loadingImg: !1,
+            imgUrl: l.rebrickable_img_url || null
+        };
+        renderModal();
+        if (l.availableColorIds) {
+            if (l.availableColorIds.length > 0) {
+                S.partModal.selColorId = sortColorIds(l.availableColorIds, l.id)[0];
+                S.partModal.qty = S.coll[e]?.[S.partModal.selColorId] || 1;
+                updateModalPartially({
+                    controls: !0
+                });
+                fetchPartColorSpecifics(l.id, S.partModal.selColorId);
+            }
+        } else {
+            fetchPartColors(l.id);
+        }
+    }
 }
 
 function openModalForSet(e) {
-    S.selSetNum = e, S.setModal = {
-        loading: !1,
-        inv: [],
-        invPage: 1,
-        hasNextInv: !1,
-        qty: S.setColl[e]?.qty || 1,
-        bulkUpdate: !1,
-        status: "",
-        statusType: "",
-        view: 'details',
-        minifigs: [],
-        loadingMinifigs: !1
-    }, renderSetModal(!0), fetchSetMinifigs(e)
+    if (SET_MAP[e]) {
+        S.selSetNum = e;
+        S.setModal = {
+            loading: !1,
+            inv: [],
+            invPage: 1,
+            hasNextInv: !1,
+            qty: S.setColl[e]?.qty || 1,
+            bulkUpdate: !1,
+            status: "",
+            statusType: "",
+            view: "details",
+            minifigs: [],
+            loadingMinifigs: !1
+        };
+        renderSetModal(!0);
+        fetchSetInventory(e);
+        fetchSetMinifigs(e);
+    }
 }
 
 function openModalForMinifig(e) {
-    S.selFigNum = e, S.minifigModal = {
-        loading: !1,
-        qty: S.minifigColl[e]?.qty || 1,
-        view: 'details',
-        inv: null,
-        loadingInv: !1,
-        invError: !1,
-        bulkUpdate: !1,
-        status: "",
-        statusType: ""
-    }, renderMinifigModal(!0)
+    if (MINIFIG_MAP[e]) {
+        S.selFigNum = e;
+        S.minifigModal = {
+            loading: !1,
+            qty: S.minifigColl[e]?.qty || 1,
+            view: 'details',
+            inv: null,
+            loadingInv: !1,
+            invError: !1,
+            bulkUpdate: !1,
+            status: '',
+            statusType: ''
+        };
+        renderMinifigModal(!0);
+    }
 }
 
-document.body.addEventListener("click", (e) => {
-    let t = e.target.closest("[data-action]");
-    if (t) {
-        const o = t.dataset;
-        switch (o.action) {
-            case "view-image-fullscreen":
+function refreshWithNewFilters() {
+    S.toDisplay = S.increment, S.gridStale = !0;
+    if ("collection" === S.view) {
+        updateUI();
+    } else if ("sets" === S.subView) {
+        if (S.q || S.selThemeId) {
+            fetchSets();
+        } else {
+            updateUI();
+        }
+    } else if ("minifigs" === S.subView) {
+        if (S.q || !S.minifigRes) {
+            fetchMinifigs();
+        } else {
+            updateUI();
+        }
+    } else if (S.q) {
+        searchRebrickableParts(S.q.trim());
+    } else if (S.selCatId) {
+        loadPartsForCategory(S.selCatId);
+    } else {
+        updateUI();
+    }
+}
+document.addEventListener("click", async e => {
+    if (!(e.target instanceof Element)) return;
+    const t = e.target;
+    const o = t.closest('[data-action="view-image-fullscreen"]');
+    if (o?.dataset.imageUrl) return openImageViewer(o.dataset.imageUrl);
+    if ("image-viewer-container" === t.id || t.closest("#image-viewer-close")) return closeImageViewer();
+    const l = t.closest('[data-action="toggle-favorite-category"]');
+    if (l?.dataset.categoryId) {
+        e.stopPropagation();
+        const t = parseInt(l.dataset.categoryId, 10);
+        return S.favCatIds.has(t) ? S.favCatIds.delete(t) : S.favCatIds.add(t), saveState(), void renderSidebar()
+    }
+    const a = t.closest('[data-action="toggle-favorite-theme"]');
+    if (a?.dataset.themeId) {
+        e.stopPropagation();
+        const t = parseInt(a.dataset.themeId, 10);
+        return S.favThemeIds.has(t) ? S.favThemeIds.delete(t) : S.favThemeIds.add(t), saveState(), void renderSidebar()
+    }
+    if (t.closest("#scroll-to-top-btn")) return mainEl.scrollTo({
+        top: 0,
+        behavior: "smooth"
+    });
+    if (t.closest("#sidebar-toggle")) return S.sidebarOpen = !0, void updateUI();
+    if (t.closest("#sidebar-close") || "sidebar-backdrop" === t.id) return S.sidebarOpen = !1, void updateUI();
+    const i = t.closest("[data-view]");
+    if (i?.dataset.view) {
+        const e = i.dataset.view;
+        if (S.view === e) return;
+        return S.view = e, S.q = "", S.err = null, S.gridStale = !0, S.selCatId = null, S.selCollCatId = null, S.selThemeId = null, S.selCollThemeId = null, void("catalog" === S.view && "minifigs" === S.subView && !S.minifigRes ? fetchMinifigs() : updateUI())
+    }
+    const n = t.closest("[data-sub-view]");
+    if (n?.dataset.subView) {
+        const e = n.dataset.subView;
+        if (S.subView === e) return;
+        return S.subView = e, S.q = "", S.err = null, "minifigs" === e ? S.increment = 20 : S.increment = 48, S.toDisplay = S.increment, S.gridStale = !0, S.filters = {
+            colorIds: [],
+            inCollectionOnly: !1
+        }, S.setFilters = {
+            minYear: "",
+            maxYear: "",
+            minParts: "",
+            maxParts: ""
+        }, S.selCatId = null, S.selCollCatId = null, S.selThemeId = null, S.selCollThemeId = null, S.searchGroups = null, S.catGroups = null, S.setRes = null, S.searchSetRes = null, S.minifigRes = null, S.searchMinifigRes = null, "sets" === e ? S.sortBy = "year_desc" : "minifigs" === e ? S.sortBy = "name_asc" : S.sortBy = "popularity", void("catalog" === S.view && "minifigs" === e && !S.minifigRes ? fetchMinifigs() : updateUI())
+    }
+    if (t.closest('[data-action="show-all-collection-items"]')) return "parts" === S.subView && (S.selCollCatId = null), "sets" === S.subView && (S.selCollThemeId = null), S.gridStale = !0, void updateUI();
+    const r = t.closest("[data-theme-id]");
+    if (r?.dataset.themeId) {
+        const e = parseInt(r.dataset.themeId, 10),
+            t = THEME_MAP[e],
+            o = t && Array.isArray(t.children) && t.children.length > 0;
+        if (o) {
+            S.expThemes.has(e) ? S.expThemes.delete(e) : S.expThemes.add(e)
+        }
+        if ("collection" === S.view) S.selCollThemeId !== e && (S.selCollThemeId = e, S.gridStale = !0, updateUI());
+        else if (S.selThemeId !== e) {
+            S.selThemeId = e, S.q = "", S.sortBy = "year_desc", S.setFilters = {
+                minYear: "",
+                maxYear: "",
+                minParts: "",
+                maxParts: ""
+            };
+            fetchSets()
+        }
+        return void(o && renderSidebar())
+    }
+    const s = t.closest("[data-parent-category]");
+    if (s?.dataset.parentCategory) {
+        const e = s.dataset.parentCategory,
+            t = S.expCats.has(e);
+        return t ? S.expCats.delete(e) : S.expCats.add(e), void renderSidebar()
+    }
+    const c = t.closest("[data-category-id]");
+    if (c?.dataset.categoryId) {
+        const e = parseInt(c.dataset.categoryId, 10);
+        return S.q = "", "collection" === S.view ? S.selCollCatId !== e && (S.selCollCatId = e, S.gridStale = !0, updateUI()) : S.selCatId !== e && (S.selCatId = e, S.filters = {
+            colorIds: [],
+            inCollectionOnly: !1
+        }, S.sortBy = "popularity", loadPartsForCategory(e)), void 0
+    }
+    if (t.closest("#feeling-lucky-button")) return handleFeelingLucky();
+    const d = t.closest('[data-action="delete-from-collection"]');
+    if (d?.dataset.partId && d.dataset.colorId) return await handleUpdateCollection(d.dataset.partId, d.dataset.colorId, 0);
+    const u = t.closest(".minifig-card");
+    if (u?.dataset.figNum) return openModalForMinifig(u.dataset.figNum);
+    const g = t.closest(".set-card");
+    if (g?.dataset.setNum) return openModalForSet(g.dataset.setNum);
+    const m = t.closest(".part-card");
+    if (m?.dataset.groupId && m.dataset.partId) {
+        const e = m.dataset.partId,
+            t = m.dataset.groupId,
+            o = PART_MAP[e];
+        if (!o) return;
+        let l = [o];
+        if ("catalog" === S.view) {
+            const e = S.searchGroups || S.catGroups;
+            l = e && e[t] ? e[t] : [o]
+        } else {
+            const e = Object.values(PART_MAP);
+            (l = e.filter(p => p && getGroupId(p.part_num) === t).sort(partCmp));
+            if (l.length === 0) {
+                l = [o];
+            }
+        }
+        openModalForPart(e, t, l);
+        if ("collection" === S.view && m.dataset.colorId) {
+            S.partModal.selColorId = m.dataset.colorId;
+            S.partModal.qty = S.coll[e]?.[S.partModal.selColorId] || 1;
+            updateModalPartially({
+                controls: !0
+            });
+            fetchPartColorSpecifics(e, S.partModal.selColorId);
+        }
+        return;
+    }
+    if ("modal-container" === t.id || t.closest("#modal-close")) return closeModal();
+    if ("set-modal-container" === t.id || t.closest("#set-modal-close")) return closeSetModal();
+    if ("minifig-modal-container" === t.id || t.closest("#minifig-modal-close")) return closeMinifigModal();
+    if ("filter-modal-container" === t.id || t.closest("#filter-modal-close")) return closeFilterModal();
+    if ("settings-modal-container" === t.id || t.closest("#settings-modal-close")) return closeSettingsModal();
+    if (t.closest("#search-button")) return triggerSearch();
+    if (t.closest("#clear-search")) {
+        S.q = "";
+        const searchInput = document.getElementById("search-input");
+        if (searchInput) searchInput.value = '';
+        return void triggerSearch()
+    }
+    if (t.closest("#filter-button")) {
+        S.filterOpen = !0;
+        tempFilters = {
+            filters: JSON.parse(JSON.stringify(S.filters)),
+            setFilters: JSON.parse(JSON.stringify(S.setFilters)),
+            sortBy: S.sortBy
+        };
+        return void renderFilterModal();
+    }
+    if (t.closest("#settings-button")) return S.settingsOpen = !0, void renderSettingsModal();
+    const h = t.closest('[data-action="remove-filter"]');
+    if (h) {
+        const e = h.dataset.filterType;
+        if ("color" === e) {
+            S.filters.colorIds = S.filters.colorIds.filter(id => id !== h.dataset.colorId)
+        }
+        if ("inCollectionOnly" === e) {
+            S.filters.inCollectionOnly = !1;
+        }
+        if ("sortBy" === e) {
+            S.sortBy = S.q ? "relevance" : "popularity";
+        }
+        return void refreshWithNewFilters()
+    }
+    if (t.closest('[data-action="remove-all-filters"]')) {
+        if ("sets" === S.subView) {
+            S.setFilters = {
+                minYear: "",
+                maxYear: "",
+                minParts: "",
+                maxParts: ""
+            };
+            S.sortBy = S.q ? "relevance" : "year_desc";
+        } else if ("minifigs" === S.subView) {
+            S.sortBy = S.q ? "relevance" : "name_asc";
+        } else {
+            S.filters.colorIds = [];
+            S.filters.inCollectionOnly = !1;
+            S.sortBy = S.q ? "relevance" : "popularity";
+        }
+        return void refreshWithNewFilters();
+    }
+    if (settingsModalEl?.contains(t)) {
+        const e = t.closest("[data-action]");
+        if (!e) return;
+        switch (e.dataset.action) {
+            case "delete-all-parts":
+                S.settingsModal.delConfirm = "parts";
+                renderSettingsModal();
+                break;
+            case "cancel-delete":
+                S.settingsModal.delConfirm = null;
+                renderSettingsModal();
+                break;
+            case "confirm-delete-parts":
+                S.coll = {};
+                saveState();
+                updateSettingsStatus("Все детали удалены из коллекции.", "success", 3000);
+                S.settingsModal.delConfirm = null;
+                S.gridStale = !0;
+                updateUI();
+                renderSettingsModal();
+                break;
+            case "delete-all-sets":
+                S.settingsModal.delConfirm = "sets";
+                renderSettingsModal();
+                break;
+            case "confirm-delete-sets":
+                S.setColl = {};
+                saveState();
+                updateSettingsStatus("Все наборы удалены из коллекции.", "success", 3000);
+                S.settingsModal.delConfirm = null;
+                S.gridStale = !0;
+                updateUI();
+                renderSettingsModal();
+                break;
+            case "delete-all-minifigs":
+                S.settingsModal.delConfirm = "minifigs";
+                renderSettingsModal();
+                break;
+            case "confirm-delete-minifigs":
+                S.minifigColl = {};
+                saveState();
+                updateSettingsStatus("Все минифигурки удалены из коллекции.", "success", 3000);
+                S.settingsModal.delConfirm = null;
+                S.gridStale = !0;
+                updateUI();
+                renderSettingsModal();
+                break;
+            case "import-zip":
+                document.getElementById('import-zip-input')?.click();
+                break;
+            case "export-zip":
+                await exportCollectionAndCacheToZip();
+                break;
+        }
+        return
+    }
+    if (filterModalEl?.contains(t)) {
+        const e = t.closest("[data-action]");
+        if (!e) return;
+        switch (e.dataset.action) {
+            case "modal-set-sort":
+                tempFilters.sortBy = t.value;
+                break;
+            case "modal-toggle-collection":
+                tempFilters.filters.inCollectionOnly = t.checked;
+                break;
+            case "modal-set-color":
                 {
-                    if (o.imageUrl) {
-                        viewerImg.src = o.imageUrl;
-                        viewerEl.classList.remove('viewer-hidden');
-                        requestAnimationFrame(() => viewerEl.classList.add('visible'));
+                    const {
+                        colorId: e
+                    } = t.dataset;
+                    if (!e) break;
+                    if ("null" === e) {
+                        tempFilters.filters.colorIds = [];
+                    } else {
+                        const t = tempFilters.filters.colorIds.indexOf(e);
+                        t > -1 ? tempFilters.filters.colorIds.splice(t, 1) : tempFilters.filters.colorIds.push(e)
                     }
+                    updateFilterModalUI();
                     break;
                 }
-            case "go-to-category":
-                closeModal();
-                S.view = 'catalog', S.subView = 'parts', S.selCollCatId = null, loadPartsForCategory(parseInt(o.categoryId, 10));
+            case "modal-reset-filters":
+                "sets" === S.subView ? (tempFilters.sortBy = S.q ? "relevance" : "year_desc", tempFilters.setFilters = {
+                    minYear: "",
+                    maxYear: "",
+                    minParts: "",
+                    maxParts: ""
+                }) : "minifigs" === S.subView ? tempFilters.sortBy = S.q ? "relevance" : "name_asc" : (tempFilters.sortBy = S.q ? "relevance" : "popularity", tempFilters.filters = {
+                    colorIds: [],
+                    inCollectionOnly: !1
+                });
+                renderFilterModal();
                 break;
-            case "go-to-theme":
-                closeSetModal();
-                S.view = 'catalog', S.subView = 'sets', S.selThemeId = parseInt(o.themeId, 10), S.selCollThemeId = null, fetchSets();
+            case "modal-apply-filters":
+                S.filters = tempFilters.filters, S.setFilters = tempFilters.setFilters, S.sortBy = tempFilters.sortBy;
+                closeFilterModal();
+                refreshWithNewFilters();
+                break
+        }
+        return
+    }
+    if (setModalEl?.contains(t)) {
+        const e = t.closest("[data-action]");
+        if (!e) return;
+        const {
+            action: o
+        } = e.dataset;
+        switch (o) {
+            case "decrease-set-qty":
+                S.setModal.qty = Math.max(1, S.setModal.qty - 1), updateSetModalControlsState();
                 break;
-            case "delete-from-collection":
-                handleUpdateCollection(o.partId, o.colorId, 0);
-                break;
-            case "delete-from-collection-modal":
-                {
-                    const {
-                        selPartId: e,
-                        selColorId: t
-                    } = S.partModal;e && t && (S.partModal.qty = 1, handleUpdateCollection(e, t, 0));
-                    break;
-                }
-            case "update-collection":
-                {
-                    const {
-                        selPartId: e,
-                        selColorId: t,
-                        qty: o
-                    } = S.partModal;e && t && handleUpdateCollection(e, t, o);
-                    break;
-                }
-            case "decrease-qty":
-                S.partModal.qty = Math.max(1, S.partModal.qty - 1), updateModalControlsState();
-                break;
-            case "increase-qty":
-                S.partModal.qty += 1, updateModalControlsState();
-                break;
-            case "retry-fetch-colors":
-                S.selPartId && fetchPartColors(S.selPartId);
+            case "increase-set-qty":
+                S.setModal.qty = Math.min(999, S.setModal.qty + 1), updateSetModalControlsState();
                 break;
             case "update-set-collection":
                 handleUpdateSetCollection(S.selSetNum, S.setModal.qty);
                 break;
             case "delete-from-set-collection-modal":
-                S.setModal.qty = 1, handleUpdateSetCollection(S.selSetNum, 0);
-                break;
-            case "decrease-set-qty":
-                S.setModal.qty = Math.max(1, S.setModal.qty - 1), updateSetModalControlsState();
-                break;
-            case "increase-set-qty":
-                S.setModal.qty += 1, updateSetModalControlsState();
-                break;
-            case "toggle-set-modal-view":
-                S.setModal.view = "details" === S.setModal.view ? "inventory" : "details", S.selSetNum && (renderSetModal(), "inventory" === S.setModal.view && S.setModal.inv.length === 0 && fetchSetInventory(S.selSetNum));
-                break;
-            case "load-more-inventory":
-                S.selSetNum && S.setModal.hasNextInv && fetchSetInventory(S.selSetNum, S.setModal.invPage + 1);
+                handleUpdateSetCollection(S.selSetNum, 0);
                 break;
             case "bulk-add-parts":
-                S.selSetNum && handleBulkUpdatePartsFromSet(S.selSetNum, "add");
+                await handleBulkUpdatePartsFromSet(S.selSetNum, "add");
                 break;
             case "bulk-remove-parts":
-                S.selSetNum && handleBulkUpdatePartsFromSet(S.selSetNum, "remove");
+                await handleBulkUpdatePartsFromSet(S.selSetNum, "remove");
                 break;
-            case "add-minifig-to-collection":
-                {
-                    const e = o.figNum;
-                    const t = parseInt(o.quantity, 10);
-                    const l = S.minifigColl[e]?.qty || 0;handleUpdateMinifigCollection(e, l + t);
-                    break;
-                }
-            case "add-minifig-parts-to-collection":
-                {
-                    const e = o.figNum;
-                    const fig = S.setModal.minifigs.find(f => f.set_num === e);
-                    if (fig && fig.parts) {
-                        S.setModal.bulkUpdate = true;
-                        updateSetModalView();
-                        fig.parts.forEach(partInfo => {
-                            const partNum = partInfo.part.part_num;
-                            const colorId = String(partInfo.color.id);
-                            const qty = partInfo.quantity;
-                            S.coll[partNum] || (S.coll[partNum] = {});
-                            S.coll[partNum][colorId] = (S.coll[partNum][colorId] || 0) + qty;
-                        });
-                        saveState();
-                        S.gridStale = true;
-                        setTimeout(() => {
-                            S.setModal.bulkUpdate = false;
-                            updateSetModalView();
-                            renderSidebar();
-                        }, 1000);
-                    }
-                    break;
-                }
+            case "toggle-set-modal-view":
+                S.setModal.view = "details" === S.setModal.view ? "inventory" : "details", renderSetModal();
+                break;
+            case "load-more-inventory":
+                S.selSetNum && fetchSetInventory(S.selSetNum, S.setModal.invPage + 1);
+                break;
             case "toggle-minifig-parts":
                 {
-                    const e = o.figNum;
-                    const t = S.setModal.minifigs.find(t => t.set_num === e);
-                    if (t) {
-                        if (t.isExpanded = !t.isExpanded, t.isExpanded && !t.parts && !t.loadingError) {
-                            t.isLoadingParts = !0;
+                    const t = e.dataset.figNum,
+                        o = S.setModal.minifigs.find(e => e.set_num === t);
+                    if (o) {
+                        if (o.isExpanded = !o.isExpanded, o.isExpanded && !o.parts && !o.isLoadingParts && !o.loadingError) {
+                            o.isLoadingParts = !0;
                             updateSetModalView();
-                            fetchMinifigParts(e).then(e => {
-                                t.parts = e
-                            }).catch(() => {
-                                t.loadingError = !0
-                            }).finally(() => {
-                                t.isLoadingParts = !1, S.selSetNum && updateSetModalView()
-                            })
+                            try {
+                                o.parts = await fetchMinifigParts(t);
+                            } catch (l) {
+                                o.loadingError = !0;
+                            } finally {
+                                o.isLoadingParts = !1, updateSetModalView()
+                            }
                         } else updateSetModalView()
                     }
                     break;
                 }
             case "retry-load-minifig-parts":
                 {
-                    const e = o.figNum;
-                    const t = S.setModal.minifigs.find(t => t.set_num === e);t && (t.loadingError = !1, t.isLoadingParts = !0, updateSetModalView(), fetchMinifigParts(e).then(e => {
-                        t.parts = e
-                    }).catch(() => {
-                        t.loadingError = !0
-                    }).finally(() => {
-                        t.isLoadingParts = !1, S.selSetNum && updateSetModalView()
-                    }));
+                    const t = e.dataset.figNum,
+                        o = S.setModal.minifigs.find(e => e.set_num === t);
+                    o && (o.isLoadingParts = !0, o.loadingError = !1, updateSetModalView(), (async () => {
+                        try {
+                            o.parts = await fetchMinifigParts(t)
+                        } catch (e) {
+                            o.loadingError = !0
+                        } finally {
+                            o.isLoadingParts = !1, updateSetModalView()
+                        }
+                    })());
                     break;
                 }
-            case "toggle-minifig-modal-view":
-                S.minifigModal.view = "details" === S.minifigModal.view ? "inventory" : "details", S.selFigNum && (renderMinifigModal(), "inventory" === S.minifigModal.view && !S.minifigModal.inv && (S.minifigModal.loadingInv = !0, updateMinifigModalView(), fetchMinifigParts(S.selFigNum).then(e => {
-                    S.minifigModal.inv = e
-                }).catch(() => {
-                    S.minifigModal.invError = !0
-                }).finally(() => {
-                    S.minifigModal.loadingInv = !1, S.selFigNum && updateMinifigModalView()
-                })));
+            case "add-minifig-parts-to-collection":
+                await handleBulkAddMinifigParts(e.dataset.figNum);
                 break;
-            case "retry-load-minifig-inv":
-                S.selFigNum && !S.minifigModal.inv && (S.minifigModal.loadingInv = !0, S.minifigModal.invError = !1, updateMinifigModalView(), fetchMinifigParts(S.selFigNum).then(e => {
-                    S.minifigModal.inv = e
-                }).catch(() => {
-                    S.minifigModal.invError = !0
-                }).finally(() => {
-                    S.minifigModal.loadingInv = !1, S.selFigNum && updateMinifigModalView()
-                }));
-                break;
-            case "add-minifig-parts-modal":
+            case "add-minifig-to-collection":
                 {
-                    const e = S.minifigModal.inv;
-                    if (e && !S.minifigModal.bulkUpdate) {
-                        S.minifigModal.bulkUpdate = !0, updateMinifigModalView();
-                        const t = S.minifigModal.qty;
-                        e.forEach(e => {
-                            const o = e.part.part_num,
-                                l = String(e.color.id),
-                                a = e.quantity * t;
-                            S.coll[o] || (S.coll[o] = {});
-                            S.coll[o][l] = (S.coll[o][l] || 0) + a
-                        }), saveState(), S.minifigModal.status = `Детали добавлены в коллекцию.`, S.minifigModal.statusType = "success", setTimeout(() => {
-                            S.minifigModal.bulkUpdate = !1, S.minifigModal.status = "", updateMinifigModalView(), renderSidebar()
-                        }, 2e3)
-                    }
+                    const {
+                        figNum: t,
+                        quantity: o
+                    } = e.dataset;
+                    if (!t || !o) break;
+                    const l = parseInt(o, 10);
+                    handleUpdateMinifigCollection(t, (S.minifigColl[t]?.qty || 0) + l, !1);
                     break;
                 }
+            case "go-to-theme":
+                S.selThemeId = parseInt(e.dataset.themeId, 10), S.view = "catalog", S.q = "", S.sortBy = "year_desc", S.setFilters = {
+                    minYear: "",
+                    maxYear: "",
+                    minParts: "",
+                    maxParts: ""
+                }, closeSetModal(), await fetchSets();
+                break
+        }
+        return
+    }
+    if (minifigModalEl?.contains(t)) {
+        const e = t.closest("[data-action]");
+        if (!e) return;
+        switch (e.dataset.action) {
             case "decrease-minifig-qty":
-                S.minifigModal.qty = Math.max(1, S.minifigModal.qty - 1), updateMinifigModalView();
+                S.minifigModal.qty = Math.max(1, S.minifigModal.qty - 1);
+                updateMinifigModalView();
                 break;
             case "increase-minifig-qty":
-                S.minifigModal.qty += 1, updateMinifigModalView();
+                S.minifigModal.qty = Math.min(999, S.minifigModal.qty + 1);
+                updateMinifigModalView();
                 break;
             case "update-minifig-collection":
-                handleUpdateMinifigCollection(S.selFigNum, S.minifigModal.qty, !1);
+                handleUpdateMinifigCollection(S.selFigNum, S.minifigModal.qty, !0);
                 break;
             case "delete-from-minifig-collection-modal":
-                S.minifigModal.qty = 1, handleUpdateMinifigCollection(S.selFigNum, 0, !1);
+                handleUpdateMinifigCollection(S.selFigNum, 0, !0);
                 break;
-            case "remove-filter":
-                if ("color" === o.filterType) {
-                    const e = S.filters.colorIds.indexOf(o.colorId); - 1 !== e && S.filters.colorIds.splice(e, 1)
-                } else "inCollectionOnly" === o.filterType ? S.filters.inCollectionOnly = !1 : "sortBy" === o.filterType && (S.sortBy = S.q ? "relevance" : "popularity");
-                S.gridStale = !0;
-                "parts" === S.subView && (S.q ? searchRebrickableParts(S.q) : S.selCatId && loadPartsForCategory(S.selCatId) || updateUI());
+            case "toggle-minifig-modal-view":
+                S.minifigModal.view = "details" === S.minifigModal.view ? "inventory" : "details";
+                if ("inventory" === S.minifigModal.view && !S.minifigModal.inv && !S.minifigModal.loadingInv && !S.minifigModal.invError) {
+                    S.minifigModal.loadingInv = !0, updateMinifigModalView();
+                    fetchMinifigParts(S.selFigNum).then(e => {
+                        S.minifigModal.inv = e, S.minifigModal.invError = !1
+                    }).catch(() => S.minifigModal.invError = !0).finally(() => {
+                        S.minifigModal.loadingInv = !1, S.selFigNum && updateMinifigModalView()
+                    })
+                } else renderMinifigModal();
                 break;
-            case "remove-all-filters":
-                S.filters.colorIds = [], S.filters.inCollectionOnly = !1, S.sortBy = S.q ? "relevance" : "popularity", S.setFilters = {
-                    minYear: "",
-                    maxYear: "",
-                    minParts: "",
-                    maxParts: ""
-                }, S.gridStale = !0, "parts" === S.subView ? S.q ? searchRebrickableParts(S.q) : S.selCatId ? loadPartsForCategory(S.selCatId) : updateUI() : fetchSets();
-                break;
-            case "modal-reset-filters":
-                tempFilters = JSON.parse(JSON.stringify({
-                    filters: S.filters,
-                    setFilters: S.setFilters,
-                    sortBy: S.sortBy
-                })), "sets" === S.subView ? (tempFilters.setFilters = {
-                    minYear: "",
-                    maxYear: "",
-                    minParts: "",
-                    maxParts: ""
-                }, tempFilters.sortBy = S.q ? "relevance" : "year_desc") : (tempFilters.filters.colorIds = [], tempFilters.filters.inCollectionOnly = !1, tempFilters.sortBy = S.q ? "relevance" : "popularity"), renderFilterModal();
-                break;
-            case "modal-apply-filters":
-                S.filters = JSON.parse(JSON.stringify(tempFilters.filters)), S.setFilters = JSON.parse(JSON.stringify(tempFilters.setFilters)), S.sortBy = tempFilters.sortBy, S.gridStale = !0, S.toDisplay = S.increment, "parts" === S.subView ? S.q ? searchRebrickableParts(S.q) : S.selCatId ? loadPartsForCategory(S.selCatId) : updateUI() : "sets" === S.subView ? fetchSets() : fetchMinifigs(), closeFilterModal();
-                break;
-            case "modal-set-sort":
-                tempFilters.sortBy = e.target.value, updateFilterModalUI();
-                break;
-            case "modal-toggle-collection":
-                tempFilters.filters.inCollectionOnly = e.target.checked, updateFilterModalUI();
-                break;
-            case "modal-set-color":
-                {
-                    const e = o.colorId;
-                    if ("null" === e) tempFilters.filters.colorIds = [];
-                    else {
-                        const t = tempFilters.filters.colorIds.indexOf(e); - 1 !== t ? tempFilters.filters.colorIds.splice(t, 1) : tempFilters.filters.colorIds.push(e)
-                    }
-                    updateFilterModalUI();
-                    break;
+            case "retry-load-minifig-inv":
+                if (S.selFigNum) {
+                    S.minifigModal.loadingInv = !0, S.minifigModal.invError = !1, updateMinifigModalView();
+                    fetchMinifigParts(S.selFigNum).then(e => S.minifigModal.inv = e).catch(() => S.minifigModal.invError = !0).finally(() => {
+                        S.minifigModal.loadingInv = !1, S.selFigNum && updateMinifigModalView()
+                    })
                 }
-            case "import-zip":
-                document.getElementById("import-zip-input").click();
                 break;
-            case "export-csv":
-                exportCollectionCsv();
-                break;
-            case "export-zip":
-                exportCollectionAndCacheToZip();
-                break;
-            case "delete-all-parts":
-                S.settingsModal.delConfirm = "parts", renderSettingsModal();
-                break;
-            case "confirm-delete-parts":
-                S.coll = {}, saveState(), S.settingsModal.delConfirm = null, S.gridStale = !0, updateUI(), closeSettingsModal();
-                break;
-            case "delete-all-sets":
-                S.settingsModal.delConfirm = "sets", renderSettingsModal();
-                break;
-            case "confirm-delete-sets":
-                S.setColl = {}, saveState(), S.settingsModal.delConfirm = null, S.gridStale = !0, updateUI(), closeSettingsModal();
-                break;
-            case "delete-all-minifigs":
-                S.settingsModal.delConfirm = "minifigs", renderSettingsModal();
-                break;
-            case "confirm-delete-minifigs":
-                S.minifigColl = {}, saveState(), S.settingsModal.delConfirm = null, S.gridStale = !0, updateUI(), closeSettingsModal();
-                break;
-            case "cancel-delete":
-                S.settingsModal.delConfirm = null, renderSettingsModal();
-                break;
+            case "add-minifig-parts-modal":
+                await handleBulkAddMinifigPartsFromModal(S.selFigNum);
+                break
         }
-        e.stopPropagation()
+        return
     }
-});
-sidebarEl.addEventListener("click", e => {
-    const t = e.target.closest("[data-view]");
-    if (t) return S.view = t.dataset.view, "collection" === S.view ? (S.selCatId = null, S.selThemeId = null, S.q = "") : (S.selCollCatId = null, S.selCollThemeId = null), S.gridStale = !0, S.err = null, S.loading = !1, S.toDisplay = S.increment, void updateUI();
-    const o = e.target.closest("[data-sub-view]");
-    if (o) {
-        const e = o.dataset.subView;
-        if (e === S.subView) return;
-        S.subView = e, S.q = "", S.selCatId = null, S.selCollCatId = null, S.selThemeId = null, S.selCollThemeId = null, S.catGroups = null, S.searchGroups = null, S.setRes = null, S.searchSetRes = null, S.minifigRes = null, S.searchMinifigRes = null, S.err = null, S.gridStale = !0, S.toDisplay = S.increment, "parts" === e ? S.sortBy = "catalog" === S.view && S.q ? "relevance" : "popularity" : "sets" === e ? S.sortBy = "catalog" === S.view && S.q ? "relevance" : "year_desc" : S.sortBy = "catalog" === S.view && S.q ? "relevance" : "name_asc", updateUI()
-    }
-    const l = e.target.closest("[data-category-id]");
-    if (l && !e.target.closest('[data-action="toggle-favorite-category"]')) {
-        const e = parseInt(l.dataset.categoryId, 10);
-        return "catalog" === S.view ? (S.selCatId !== e && (S.selCatId = e, S.sortBy = "popularity", loadPartsForCategory(e))) : (S.selCollCatId = e, S.q = "", S.gridStale = !0, S.err = null, updateUI()), void(window.innerWidth < 1024 && (S.sidebarOpen = !1))
-    }
-    const a = e.target.closest("[data-parent-category]");
-    if (a) {
-        const e = a.dataset.parentCategory;
-        S.expCats.has(e) ? S.expCats.delete(e) : S.expCats.add(e), renderSidebar()
-    }
-    const i = e.target.closest('[data-action="toggle-favorite-category"]');
-    if (i) {
-        const e = parseInt(i.dataset.categoryId, 10);
-        return S.favCatIds.has(e) ? S.favCatIds.delete(e) : S.favCatIds.add(e), saveState(), void renderSidebar()
-    }
-    const n = e.target.closest("[data-theme-id]");
-    if (n && !e.target.closest('[data-action="toggle-favorite-theme"]')) {
-        const e = parseInt(n.dataset.themeId, 10);
-        const t = THEME_MAP[e];
-        if (t?.children?.length > 0) {
-            S.expThemes.has(e) ? S.expThemes.delete(e) : S.expThemes.add(e), renderSidebar()
+    if (partModalEl?.contains(t)) {
+        const e = t.closest("[data-action]");
+        if (e) switch (e.dataset.action) {
+            case "decrease-qty":
+                S.partModal.qty = Math.max(1, S.partModal.qty - 1), updateModalControlsState();
+                break;
+            case "increase-qty":
+                S.partModal.qty = Math.min(9999, S.partModal.qty + 1), updateModalControlsState();
+                break;
+            case "update-collection":
+                if (S.selPartId && S.partModal.selColorId) {
+                    const e = S.coll[S.selPartId]?.[S.partModal.selColorId] || 0;
+                    await handleUpdateCollection(S.selPartId, S.partModal.selColorId, e + S.partModal.qty), S.partModal.qty = 1
+                }
+                break;
+            case "delete-from-collection-modal":
+                S.selPartId && S.partModal.selColorId && (await handleUpdateCollection(S.selPartId, S.partModal.selColorId, 0), S.partModal.qty = 1);
+                break;
+            case "go-to-category":
+                const t = parseInt(e.dataset.categoryId, 10);
+                S.view = "catalog", S.subView = "parts", S.q = "", S.selCatId = t, S.filters = {
+                    colorIds: [],
+                    inCollectionOnly: !1
+                }, S.sortBy = "popularity", closeModal(), await loadPartsForCategory(t);
+                break;
+            case "retry-fetch-colors":
+                S.selPartId && fetchPartColors(S.selPartId);
+                break
         }
-        if ("catalog" === S.view) {
-            (S.selThemeId !== e) && (S.selThemeId = e, S.sortBy = "year_desc", fetchSets())
-        } else {
-            (S.selCollThemeId = e, S.q = "", S.gridStale = !0, S.err = null, updateUI())
+        const o = t.closest("[data-color-id]");
+        if (o) {
+            S.partModal.selColorId = o.dataset.colorId, S.partModal.qty = S.coll[S.selPartId]?.[S.partModal.selColorId] || 1, updateModalPartially({
+                colors: !0,
+                controls: !0
+            }), fetchPartColorSpecifics(S.selPartId, S.partModal.selColorId)
         }
-        if (window.innerWidth < 1024) {
-            S.sidebarOpen = !1
-        }
+        const l = t.closest("#variation-select");
+        l && l.value !== S.selPartId && openModalForPart(l.value, S.partModal.groupId, S.partModal.variants)
     }
-    const r = e.target.closest('[data-action="toggle-favorite-theme"]');
-    if (r) {
-        const e = parseInt(r.dataset.themeId, 10);
-        return S.favThemeIds.has(e) ? S.favThemeIds.delete(e) : S.favThemeIds.add(e), saveState(), void renderSidebar()
-    }
-    const s = e.target.closest("#sidebar-close");
-    s && (S.sidebarOpen = !1, updateUI());
-    const c = e.target.closest("[data-action='show-all-collection-items']");
-    if (c) {
-        "parts" === S.subView ? S.selCollCatId = null : S.selCollThemeId = null, S.q = "", S.gridStale = !0, S.err = null, updateUI()
-    }
-    const d = e.target.closest("#settings-button");
-    d && (S.settingsModal = {
-        delConfirm: null,
-        status: "",
-        statusType: "info"
-    }, S.settingsOpen = !0, renderSettingsModal());
 });
-headerEl.addEventListener("click", e => {
-    const t = e.target.closest("#sidebar-toggle");
-    if (t) return S.sidebarOpen = !S.sidebarOpen, void updateUI();
-    const o = e.target.closest("#search-button");
-    if (o) {
-        const e = document.getElementById("search-input").value;
-        return S.q = e.trim(), S.toDisplay = S.increment, S.gridStale = !0, "parts" === S.subView ? (S.sortBy = S.q ? "relevance" : "popularity", searchRebrickableParts(S.q)) : "sets" === S.subView ? (S.sortBy = S.q ? "relevance" : "year_desc", fetchSets()) : (S.sortBy = S.q ? "relevance" : "name_asc", fetchMinifigs()), void 0
-    }
-    const l = e.target.closest("#clear-search");
-    if (l) return S.q = "", S.searchGroups = null, S.searchSetRes = null, S.searchMinifigRes = null, S.gridStale = !0, "parts" === S.subView ? (S.sortBy = "popularity", S.selCatId && loadPartsForCategory(S.selCatId) || updateUI()) : "sets" === S.subView ? (S.sortBy = "year_desc", S.selThemeId && fetchSets() || updateUI()) : (S.sortBy = "name_asc", fetchMinifigs()), void 0;
-    const a = e.target.closest("#filter-button");
-    a && (tempFilters = JSON.parse(JSON.stringify({
-        filters: S.filters,
-        setFilters: S.setFilters,
-        sortBy: S.sortBy
-    })), S.filterOpen = !0, renderFilterModal())
-});
-headerEl.addEventListener("input", e => {
-    const t = e.target.closest("#search-input");
-    t && (S.q = t.value.trim(), document.getElementById("clear-search")?.classList.toggle("hidden", "" === S.q))
-});
-headerEl.addEventListener("keyup", e => {
-    const t = e.target.closest("#search-input");
-    t && "Enter" === e.key && (S.q = t.value.trim(), S.toDisplay = S.increment, S.gridStale = !0, "parts" === S.subView ? (S.sortBy = S.q ? "relevance" : "popularity", searchRebrickableParts(S.q)) : "sets" === S.subView ? (S.sortBy = S.q ? "relevance" : "year_desc", fetchSets()) : (S.sortBy = S.q ? "relevance" : "name_asc", fetchMinifigs()))
-});
-mainEl.addEventListener("click", e => {
-    const t = e.target.closest(".part-card");
-    if (t && !e.target.closest('[data-action="delete-from-collection"]')) {
-        const e = t.dataset.partId,
-            o = t.dataset.groupId,
-            l = "collection" === S.view ? [PART_MAP[e]] : (S.searchGroups ? S.searchGroups[o] : S.catGroups[o]) || [];
-        return void openModalForPart(e, o, l)
-    }
-    const o = e.target.closest(".set-card");
-    if (o) return void openModalForSet(o.dataset.setNum);
-    const l = e.target.closest(".minifig-card");
-    if (l) return void openModalForMinifig(l.dataset.figNum);
-    const a = e.target.closest("#feeling-lucky-button");
-    a && handleFeelingLucky()
-});
-partModalEl.addEventListener("click", e => {
+document.addEventListener("input", e => {
+    if (!(e.target instanceof HTMLInputElement)) return;
     const t = e.target;
-    if ("modal-container" === t.id || t.closest("#modal-close")) return void closeModal();
-    const o = t.closest("[data-color-id]");
-    if (o) {
-        const e = o.dataset.colorId;
-        return S.partModal.selColorId !== e && (S.partModal.selColorId = e, S.partModal.qty = S.coll[S.selPartId]?.[e] || 1, updateModalPartially({
-            colors: !0,
-            controls: !0
-        }), fetchPartColorSpecifics(S.selPartId, e)), void 0
+    if ("search-input" === t.id) {
+        S.q = t.value;
+        const e = document.getElementById("clear-search");
+        e?.classList.toggle("hidden", !S.q)
+    }
+    if (t.closest("#filter-modal-content")) {
+        const e = t.dataset.filterKey;
+        e && tempFilters.setFilters.hasOwnProperty(e) && (tempFilters.setFilters[e] = t.value)
     }
 });
-partModalEl.addEventListener("change", e => {
-    const t = e.target;
-    if ("variation-select" === t.id) {
-        const e = t.value,
-            {
-                groupId: o,
-                variants: l
-            } = S.partModal;
-        openModalForPart(e, o, l)
-    }
-});
-setModalEl.addEventListener("click", e => {
-    const t = e.target;
-    ("set-modal-container" === t.id || t.closest("#set-modal-close")) && closeSetModal()
-});
-minifigModalEl.addEventListener("click", e => {
-    const t = e.target;
-    ("minifig-modal-container" === t.id || t.closest("#minifig-modal-close")) && closeMinifigModal()
-});
-filterModalEl.addEventListener("click", e => {
-    const t = e.target;
-    ("filter-modal-container" === t.id || t.closest("#filter-modal-close")) && closeFilterModal()
-});
-filterModalEl.addEventListener("input", e => {
-    const t = e.target.dataset.filterKey;
-    t && "sets" === S.subView && (tempFilters.setFilters[t] = e.target.value)
-});
-settingsModalEl.addEventListener("click", e => {
-    const t = e.target;
-    ("settings-modal-container" === t.id || t.closest("#settings-modal-close")) && closeSettingsModal()
-});
-document.getElementById("import-zip-input").addEventListener("change", e => {
-    const t = e.target.files?.[0];
-    t && importCollectionAndCacheFromZip(t), e.target.value = null
-});
-backdropEl.addEventListener("click", () => {
-    S.sidebarOpen = !1, updateUI()
+document.addEventListener("keydown", e => {
+    "Enter" === e.key && "search-input" === e.target.id && triggerSearch()
 });
 mainEl.addEventListener("scroll", () => {
-    mainEl.scrollTop > 300 ? toTopBtn.classList.add("opacity-100", "pointer-events-auto", "translate-y-0") : toTopBtn.classList.remove("opacity-100", "pointer-events-auto", "translate-y-0");
-    S.hasMoreItems && !S.loading && mainEl.scrollTop + mainEl.clientHeight >= mainEl.scrollHeight - 500 && (S.toDisplay += S.increment, renderMainContent())
+    S.hasMoreItems && !S.loading && mainEl.scrollTop + mainEl.clientHeight >= mainEl.scrollHeight - 300 && (S.toDisplay += S.increment, renderMainContent()), mainEl.scrollTop > 200 ? toTopBtn.classList.remove("opacity-0", "pointer-events-none", "translate-y-4") : toTopBtn.classList.add("opacity-0", "pointer-events-none", "translate-y-4")
 });
-toTopBtn.addEventListener("click", () => {
-    mainEl.scrollTo({
-        top: 0,
-        behavior: "smooth"
-    })
-});
-viewerCloseBtn.innerHTML = I_X("w-7 h-7");
-viewerEl.addEventListener("click", e => {
-    (e.target.id === "image-viewer-container" || e.target.closest("#image-viewer-close")) && closeImageViewer()
-});
-window.addEventListener("resize", () => {
-    const e = window.innerWidth >= 1024;
-    S.sidebarOpen !== e && (S.sidebarOpen = e, updateUI())
-});
-
-async function init() {
-    S.loading = true;
-    updateUI();
-    try {
-        loadState();
-        await Promise.all([
-            fetchAllColors(),
-            fetchCategories(),
-            fetchThemes()
-        ]);
-        S.err = null;
-        updateUI(); 
-        await Promise.all([
-            fetchMissingCollectionPartDetails(),
-            fetchMissingCollectionSetDetails(),
-            fetchMissingCollectionMinifigDetails(),
-        ]);
-        await fetchColorDetailsForCollectionParts();
-        
-    } catch (e) {
-        console.error("Initialization failed:", e);
-        S.err = S.err || e.message;
-    } finally {
-        S.loading = false;
-        S.sidebarLoading = false;
-        S.gridStale = true;
-        updateUI();
+document.getElementById("import-zip-input").addEventListener("change", async e => {
+    if (e.target.files.length > 0) {
+        const t = e.target.files[0];
+        await importCollectionAndCacheFromZip(t), e.target.value = ""
     }
+});
+async function initializeApp() {
+    S.sidebarLoading = !0, updateUI(), loadState(), await Promise.all([fetchCategories(), fetchAllColors(), fetchThemes()]), S.sidebarLoading = !1, updateUI(), await fetchMissingCollectionPartDetails(), await fetchMissingCollectionSetDetails(), await fetchMissingCollectionMinifigDetails(), await fetchColorDetailsForCollectionParts(), S.gridStale = !0, updateUI()
 }
-
-init();
-
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./service-worker.js')
-            .then(registration => {
-                console.log('ServiceWorker registration successful with scope: ', registration.scope);
-            })
-            .catch(error => {
-                console.log('ServiceWorker registration failed: ', error);
-            });
-    });
-}
-  </script>
+initializeApp();
+</script>
 </body>
 </html>

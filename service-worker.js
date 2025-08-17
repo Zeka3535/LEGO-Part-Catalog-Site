@@ -67,20 +67,23 @@ self.addEventListener('fetch', event => {
 
 function cacheFirst(request) {
     return caches.match(request).then(response => {
+        // Если ответ есть в кэше, возвращаем его
         if (response) {
             return response;
         }
+        // Иначе, делаем запрос к сети
         return fetch(request).then(networkResponse => {
-            // Клонируем ответ, чтобы одну копию положить в кэш, а другую вернуть
-            const responseToCache = networkResponse.clone();
-            caches.open(CACHE_NAME).then(cache => {
-                cache.put(request, responseToCache);
-            });
+            // Если ответ успешный, кэшируем его
+            if (networkResponse.ok) {
+                const responseToCache = networkResponse.clone();
+                caches.open(CACHE_NAME).then(cache => {
+                    cache.put(request, responseToCache);
+                });
+            }
             return networkResponse;
         });
     });
 }
-
 
 function networkFallingBackToCache(request) {
     // Сначала пытаемся получить данные из сети
