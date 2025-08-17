@@ -2030,6 +2030,35 @@ function renderFilterModal() {
         `
 }
 
+function updateSettingsStatus(status, type = 'info', clearAfter = 0) {
+    S.settingsModal.status = status;
+    S.settingsModal.statusType = type;
+
+    const statusEl = document.getElementById('import-export-status');
+    if (statusEl) {
+        if (!status) {
+            statusEl.innerHTML = '';
+            statusEl.className = 'mb-2';
+            return;
+        }
+        const statusTypeClass =
+            type === "error" ? "bg-red-900/50 text-red-300" :
+            type === "success" ? "bg-green-900/50 text-green-300" :
+            "bg-blue-900/50 text-blue-300";
+
+        statusEl.className = `mb-2 p-2 text-sm rounded-md ${statusTypeClass}`;
+        statusEl.textContent = status;
+    }
+
+    if (clearAfter > 0) {
+        setTimeout(() => {
+            if (S.settingsOpen && S.settingsModal.status === status) {
+                updateSettingsStatus("");
+            }
+        }, clearAfter);
+    }
+}
+
 function renderSettingsModal() {
     if (!S.settingsOpen) return void closeSettingsModal();
     document.body.classList.add("overflow-hidden"), settingsModalEl.classList.remove("modal-hidden"), requestAnimationFrame(() => settingsModalEl.classList.add("visible"));
@@ -2337,14 +2366,7 @@ function updateUI() {
     e ? S.sidebarOpen ? (sidebarEl.classList.remove("-translate-x-full"), backdropEl.classList.remove("hidden"), document.body.style.overflow = "hidden") : (sidebarEl.classList.add("-translate-x-full"), backdropEl.classList.add("hidden"), document.body.style.overflow = "") : (sidebarEl.classList.remove("-translate-x-full"), backdropEl.classList.add("hidden"), document.body.style.overflow = "")
 }
 
-async function ensureUrlsAreCached(urls) {
-    const setStatus = (status, type = 'info') => {
-        if (S.settingsOpen) { // Only update UI if modal is visible
-            S.settingsModal.status = status;
-            S.settingsModal.statusType = type;
-            renderSettingsModal();
-        }
-    };
+async function ensureUrlsAreCached(urls, progressCallback) {
     const cache = await caches.open(CACHE_NAME);
     const requests = await cache.keys();
     const cachedUrls = new Set(requests.map(req => req.url));
@@ -2352,21 +2374,23 @@ async function ensureUrlsAreCached(urls) {
 
     if (urlsToCache.length === 0) return;
 
-    setStatus(`Кэширование ${urlsToCache.length} новых изображений...`);
-    
+    progressCallback?.(`Кэширование ${urlsToCache.length} новых изображений...`);
+
     for (let i = 0; i < urlsToCache.length; i += 5) { // smaller batch for images
         const batch = urlsToCache.slice(i, i + 5);
         await Promise.all(batch.map(async (url) => {
             try {
                 // Use no-cors for images to avoid CORS issues with caching opaque responses
-                const response = await fetch(url, { mode: 'no-cors' });
+                const response = await fetch(url, {
+                    mode: 'no-cors'
+                });
                 // We don't check for response.ok because opaque responses have status 0
                 await cache.put(url, response);
             } catch (e) {
                 console.warn(`Failed to cache URL: ${url}`, e);
             }
         }));
-        setStatus(`Кэширование изображений... (${i + batch.length}/${urlsToCache.length})`);
+        progressCallback?.(`Кэширование изображений... (${i + batch.length}/${urlsToCache.length})`);
     }
 }
 
@@ -2417,11 +2441,7 @@ function generateCsvData() {
     return o;
 }
 async function exportCollectionAndCacheToZip() {
-    const setStatus = (status, type = 'info') => {
-        S.settingsModal.status = status;
-        S.settingsModal.statusType = type;
-        renderSettingsModal();
-    };
+    const setStatus = updateSettingsStatus;
 
     try {
         setStatus("Начало полного экспорта. Это может занять несколько минут...");
@@ -2440,9 +2460,9 @@ async function exportCollectionAndCacheToZip() {
         for (const setNum of setsToProcess) {
             processedCount++;
             setStatus(`Обработка наборов: ${processedCount}/${totalSets} (${setNum})`);
-            
+
             if (!SET_MAP[setNum]?.name) await fetchMissingCollectionSetDetails();
-            
+
             const inventory = await fetchAllSetInventory(setNum);
             inventory.forEach(item => partsToProcess.add(item.part.part_num));
 
@@ -2457,14 +2477,14 @@ async function exportCollectionAndCacheToZip() {
         for (const figNum of minifigsToProcess) {
             processedCount++;
             setStatus(`Обработка минифигурок: ${processedCount}/${totalMinifigs} (${figNum})`);
-            
+
             if (!MINIFIG_MAP[figNum]?.name) await fetchMinifigDetails(figNum);
 
             const parts = await fetchMinifigParts(figNum);
             parts.forEach(item => partsToProcess.add(item.part.part_num));
             await new Promise(r => setTimeout(r, 500)); // Throttle
         }
-        
+
         // 4. Ensure all part details and color-specific image URLs are fetched
         const allParts = [...partsToProcess];
         const missingPartDetails = allParts.filter(p => !PART_MAP[p]?.name);
@@ -2474,18 +2494,20 @@ async function exportCollectionAndCacheToZip() {
                 const batch = missingPartDetails.slice(i, i + 100);
                 try {
                     (await apiFetchPaginated(`/parts/?part_nums=${batch.join(",")}`)).map(procPart);
-                } catch (e) { console.error("Error fetching part details batch", e); }
-                 await new Promise(r => setTimeout(r, 500));
+                } catch (e) {
+                    console.error("Error fetching part details batch", e);
+                }
+                await new Promise(r => setTimeout(r, 500));
             }
         }
-        
+
         processedCount = 0;
         for (const partNum of allParts) {
             processedCount++;
             setStatus(`Загрузка данных о цветах деталей: ${processedCount}/${allParts.length} (${partNum})`);
             if (!PART_MAP[partNum] || !PART_MAP[partNum].colorImages) {
-                 await fetchColorDetailsForPart(partNum);
-                 await new Promise(r => setTimeout(r, 200)); // Throttle
+                await fetchColorDetailsForPart(partNum);
+                await new Promise(r => setTimeout(r, 200)); // Throttle
             }
         }
 
@@ -2503,9 +2525,9 @@ async function exportCollectionAndCacheToZip() {
                 }
             }
         });
-        
+
         // 6. Cache all images
-        await ensureUrlsAreCached([...imageUrls]);
+        await ensureUrlsAreCached([...imageUrls], setStatus);
 
         // 7. Generate CSV and ZIP
         setStatus("Экспорт коллекции в CSV...");
@@ -2525,7 +2547,9 @@ async function exportCollectionAndCacheToZip() {
             if (response && (response.ok || response.type === 'opaque')) { // Allow opaque responses for images
                 const blob = await response.blob();
                 const headers = {};
-                response.headers.forEach((value, key) => { headers[key] = value; });
+                response.headers.forEach((value, key) => {
+                    headers[key] = value;
+                });
                 const filePath = `r_${i}`;
                 cacheFolder.file(filePath, blob);
                 manifest.push({
@@ -2538,8 +2562,10 @@ async function exportCollectionAndCacheToZip() {
         zip.file("cache_manifest.json", JSON.stringify(manifest));
 
         setStatus(`Создание ZIP архива... (Найдено ${manifest.length} записей в кеше)`);
-        const zipBlob = await zip.generateAsync({ type: "blob" });
-        
+        const zipBlob = await zip.generateAsync({
+            type: "blob"
+        });
+
         const link = document.createElement("a");
         link.href = URL.createObjectURL(zipBlob);
         link.download = `lego-collection-backup-${new Date().toISOString().slice(0, 10)}.zip`;
@@ -2548,7 +2574,7 @@ async function exportCollectionAndCacheToZip() {
         document.body.removeChild(link);
         URL.revokeObjectURL(link.href);
 
-        setStatus("Экспорт успешно завершен!", "success");
+        setStatus("Экспорт успешно завершен!", "success", 5000);
 
     } catch (e) {
         console.error("Full ZIP Export failed:", e);
@@ -2557,10 +2583,7 @@ async function exportCollectionAndCacheToZip() {
 }
 async function processCsvData(content) {
     const t = (e, t) => {
-        S.settingsModal.status = e, S.settingsModal.statusType = t, renderSettingsModal();
-        "error" !== t && setTimeout(() => {
-            S.settingsOpen && S.settingsModal.status === e && (S.settingsModal.status = "", renderSettingsModal())
-        }, 3e3)
+        updateSettingsStatus(e, t, "error" !== t ? 3000 : 0);
     };
     try {
         const l = content.split(/\r?\n/).filter(e => "" !== e.trim());
@@ -2668,18 +2691,18 @@ async function processCsvData(content) {
     }
 }
 async function importCollectionAndCacheFromZip(file) {
-    S.settingsModal.status = "Чтение ZIP архива...", S.settingsModal.statusType = "info", renderSettingsModal();
+    updateSettingsStatus("Чтение ZIP архива...");
     try {
         const zip = await JSZip.loadAsync(file);
         const csvFile = zip.file("collection.csv");
         if (csvFile) {
-            S.settingsModal.status = "Импорт коллекции из CSV...", renderSettingsModal();
+            updateSettingsStatus("Импорт коллекции из CSV...");
             const csvContent = await csvFile.async("string");
             await processCsvData(csvContent);
         }
         const manifestFile = zip.file("cache_manifest.json");
         if (manifestFile) {
-            S.settingsModal.status = "Импорт кеша...", renderSettingsModal();
+            updateSettingsStatus("Импорт кеша...");
             const manifest = JSON.parse(await manifestFile.async("string"));
             const cache = await caches.open(CACHE_NAME);
             let importedCount = 0;
@@ -2694,14 +2717,17 @@ async function importCollectionAndCacheFromZip(file) {
                     importedCount++;
                 }
             }
-            S.settingsModal.status = `Импорт кеша завершен. Загружено ${importedCount} записей.`, S.settingsModal.statusType = "success";
-            renderSettingsModal();
+            updateSettingsStatus(`Импорт кеша завершен. Загружено ${importedCount} записей.`, "success");
         }
-        S.settingsModal.status = "Импорт завершен. Обновление данных...", S.settingsModal.statusType = "success", renderSettingsModal(), await Promise.all([fetchMissingCollectionPartDetails(), fetchMissingCollectionSetDetails(), fetchMissingCollectionMinifigDetails()]), await fetchColorDetailsForCollectionParts(), S.settingsModal.status = "Данные обновлены.", S.gridStale = !0, updateUI()
+        updateSettingsStatus("Импорт завершен. Обновление данных...", "success");
+        await Promise.all([fetchMissingCollectionPartDetails(), fetchMissingCollectionSetDetails(), fetchMissingCollectionMinifigDetails()]);
+        await fetchColorDetailsForCollectionParts();
+        updateSettingsStatus("Данные обновлены.", "success", 3000);
+        S.gridStale = !0;
+        updateUI();
     } catch (e) {
         console.error("ZIP Import failed:", e);
-        S.settingsModal.status = `Ошибка импорта ZIP: ${e.message}`, S.settingsModal.statusType = "error";
-        renderSettingsModal();
+        updateSettingsStatus(`Ошибка импорта ZIP: ${e.message}`, "error");
     }
 }
 async function handleUpdateCollection(e, t, o) {
@@ -3476,20 +3502,27 @@ document.addEventListener("click", async e => {
                 S.selFigNum && handleBulkAddMinifigPartsFromModal(S.selFigNum);
                 break;
         }
-        return;
+        return
     }
     if (filterModalEl?.contains(t)) {
         const e = t.closest("[data-action]");
-        if (e) switch (e.dataset.action) {
+        if (!e) return;
+        switch (e.dataset.action) {
             case "modal-set-sort":
-                tempFilters.sortBy = t.value;
+                const o = t;
+                tempFilters.sortBy = o.value;
                 break;
             case "modal-toggle-collection":
-                tempFilters.filters.inCollectionOnly = t.checked;
+                const l = t;
+                tempFilters.filters.inCollectionOnly = l.checked;
                 break;
             case "modal-set-color":
-                const o = e.dataset.colorId;
-                "null" === o ? tempFilters.filters.colorIds = [] : o && (tempFilters.filters.colorIds.includes(o) ? tempFilters.filters.colorIds = tempFilters.filters.colorIds.filter(id => id !== o) : tempFilters.filters.colorIds.push(o)), updateFilterModalUI();
+                const a = t.dataset.colorId;
+                if ("null" === a) tempFilters.filters.colorIds = [];
+                else if (a) {
+                    const e = tempFilters.filters.colorIds.indexOf(a);
+                    e > -1 ? tempFilters.filters.colorIds.splice(e, 1) : tempFilters.filters.colorIds.push(a)
+                }
                 break;
             case "modal-reset-filters":
                 "sets" === S.subView ? (tempFilters.setFilters = {
@@ -3497,79 +3530,77 @@ document.addEventListener("click", async e => {
                     maxYear: "",
                     minParts: "",
                     maxParts: ""
-                }, tempFilters.sortBy = S.q ? "relevance" : "year_desc") : "minifigs" === S.subView ? tempFilters.sortBy = S.q ? "relevance" : "name_asc" : (tempFilters.filters.colorIds = [], tempFilters.filters.inCollectionOnly = !1, tempFilters.sortBy = S.q ? "relevance" : "popularity"), renderFilterModal();
+                }, tempFilters.sortBy = S.q ? "relevance" : "year_desc") : "minifigs" === S.subView ? tempFilters.sortBy = S.q ? "relevance" : "name_asc" : (tempFilters.filters = {
+                    colorIds: [],
+                    inCollectionOnly: !1
+                }, tempFilters.sortBy = S.q ? "relevance" : "popularity"), renderFilterModal();
                 break;
             case "modal-apply-filters":
                 S.filters = tempFilters.filters, S.setFilters = tempFilters.setFilters, S.sortBy = tempFilters.sortBy, closeFilterModal(), refreshWithNewFilters();
                 break
         }
-        const o = t.closest("input[data-filter-key]");
-        if (o) {
-            const e = o.dataset.filterKey;
-            "minYear" === e || "maxYear" === e || "minParts" === e || "maxParts" === e ? tempFilters.setFilters[e] = o.value : "colorIds" === e || "inCollectionOnly" === e ? tempFilters.filters[e] = o.value : console.warn("Неизвестный ключ фильтра:", e)
+        return void("modal-set-sort" !== e.dataset.action && "modal-reset-filters" !== e.dataset.action && "modal-apply-filters" !== e.dataset.action && updateFilterModalUI())
+    }
+    const p = t.closest("#variation-select");
+    if (p) {
+        const e = p;
+        if (e.value && e.value !== S.selPartId) {
+            const t = S.partModal.variants.find(t => t.id === e.value);
+            t && openModalForPart(t.id, S.partModal.groupId, S.partModal.variants)
         }
+    }
+});
+document.addEventListener("keydown", e => {
+    "Escape" === e.key && (viewerEl.classList.contains("visible") ? closeImageViewer() : S.selPartId ? closeModal() : S.selSetNum ? closeSetModal() : S.selFigNum ? closeMinifigModal() : S.filterOpen ? closeFilterModal() : S.settingsOpen ? closeSettingsModal() : S.sidebarOpen && window.innerWidth < 1024 && (S.sidebarOpen = !1, updateUI()))
+});
+mainEl.addEventListener("scroll", () => {
+    const e = mainEl.scrollTop,
+        t = mainEl.scrollHeight,
+        o = mainEl.clientHeight;
+    e > 300 ? toTopBtn.classList.replace("opacity-0", "opacity-100") || (toTopBtn.classList.remove("pointer-events-none"), toTopBtn.classList.remove("translate-y-4")) : toTopBtn.classList.replace("opacity-100", "opacity-0") && (toTopBtn.classList.add("pointer-events-none"), toTopBtn.classList.add("translate-y-4")), !S.loading && S.hasMoreItems && t - e - o < 1200 && (S.toDisplay += S.increment, S.gridStale = !1, renderMainContent())
+}, {
+    passive: !0
+});
+document.addEventListener("input", e => {
+    if (!(e.target instanceof Element)) return;
+    const t = e.target;
+    if ("search-input" === t.id) {
+        S.q = t.value;
+        const e = document.getElementById("clear-search");
+        e && e.classList.toggle("hidden", !S.q)
+    }
+    if (S.filterOpen && "sets" === S.subView) {
+        const e = t.dataset.filterKey;
+        e && (tempFilters.setFilters[e] = t.value)
     }
 });
 document.addEventListener("keyup", e => {
-    if ("search-input" === e.target.id) {
-        S.q = e.target.value.trim();
-        document.getElementById('clear-search')?.classList.toggle('hidden', !S.q);
-        if ("Enter" === e.key) {
-            e.preventDefault();
-            triggerSearch();
+    "search-input" === e.target.id && "Enter" === e.key && triggerSearch()
+});
+document.getElementById('import-zip-input').addEventListener('change', (event) => {
+    const input = event.target;
+    if (input.files && input.files.length > 0) {
+        const file = input.files[0];
+        if (file) {
+            importCollectionAndCacheFromZip(file);
         }
+        input.value = ''; // Reset for next import
     }
 });
-document.getElementById('import-zip-input')?.addEventListener('change', (e) => {
-    const file = e.target.files?.[0];
-    if (file) {
-        importCollectionAndCacheFromZip(file);
-    }
-    e.target.value = null;
-});
-partModalEl.addEventListener("change", e => {
-    if (e.target.id === 'variation-select' && S.partModal.groupId) {
-        const selectedPartId = e.target.value;
-        openModalForPart(selectedPartId, S.partModal.groupId, S.partModal.variants);
-    }
-});
-mainEl.addEventListener("scroll", () => {
-    const {
-        scrollTop: e,
-        scrollHeight: t,
-        clientHeight: o
-    } = mainEl;
-    if (!S.loading && S.hasMoreItems && t - e - o < 400) {
-        S.loading = true; // Prevent multiple triggers
-        S.toDisplay += S.increment;
-        renderMainContent();
-        S.loading = false;
-    }
-    if (e > 300) {
-        toTopBtn.classList.remove("opacity-0", "pointer-events-none", "translate-y-4");
-    } else {
-        toTopBtn.classList.add("opacity-0", "pointer-events-none", "translate-y-4");
-    }
-});
-document.addEventListener('DOMContentLoaded', async () => {
-    S.sidebarLoading = true;
-    updateUI();
-    loadState();
-    await Promise.all([
-        fetchCategories(),
-        fetchThemes(),
-        fetchAllColors()
-    ]);
-    S.sidebarLoading = false;
-    await Promise.all([
-        fetchMissingCollectionPartDetails(),
-        fetchMissingCollectionSetDetails(),
-        fetchMissingCollectionMinifigDetails()
-    ]);
-    await fetchColorDetailsForCollectionParts();
-    S.gridStale = true;
-    updateUI();
-});
+
+async function initializeApp() {
+    S.loading = !0, S.sidebarLoading = !0, updateUI(), loadState(), await Promise.all([fetchCategories(), fetchThemes(), fetchAllColors()]), S.sidebarLoading = !1, updateUI(), await Promise.all([fetchMissingCollectionPartDetails(), fetchMissingCollectionSetDetails(), fetchMissingCollectionMinifigDetails()]), await fetchColorDetailsForCollectionParts(), S.loading = !1, S.gridStale = !0, "collection" === S.view || "minifigs" === S.subView ? updateUI() : "sets" === S.subView ? fetchSets() : S.selCatId ? loadPartsForCategory(S.selCatId) : updateUI();
+}
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./service-worker.js').then(registration => {
+            console.log('SW registered: ', registration);
+        }).catch(registrationError => {
+            console.log('SW registration failed: ', registrationError);
+        });
+    });
+}
+initializeApp();
   </script>
 </body>
 </html>
