@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -1198,40 +1199,28 @@ function renderAppliedFilters() {
             alpha_desc: "Алфавит (Я-А)",
             qty_desc: "Кол-во (убыв.)",
             qty_asc: "Кол-во (возр.)"
-        },
-        c = {
-            [Symbol.iterator]: function*() {
-                yield* Object.entries(this).map(([k, v]) => [k, v])
-            }
         };
-        Object.assign(c, s);
         t = S.q ? "relevance" === S.sortBy : "year_desc" === S.sortBy;
-        const d = t || !s[S.sortBy] ? "" : `
+        const c = t || !s[S.sortBy] ? "" : `
                 <div class="flex items-center bg-gray-600 text-gray-200 rounded-full pl-3 pr-2 py-1 text-sm">
                     <span class="mr-2">Сортировка: ${s[S.sortBy]}</span>
                 </div>
             `;
-        e = [d, r].filter(Boolean).join(""), o = !t || !!(l || a || i || n)
+        e = [c, r].filter(Boolean).join(""), o = !t || !!(l || a || i || n)
     } else if ("minifigs" === S.subView) {
         const l = {
             name_asc: "Алфавит (А-Я)",
             name_desc: "Алфавит (Я-А)",
             num_parts_desc: "Кол-во деталей (убыв.)",
             num_parts_asc: "Кол-во деталей (возр.)"
-        },
-        a = {
-            [Symbol.iterator]: function*() {
-                yield* Object.entries(this).map(([k, v]) => [k, v])
-            }
         };
-        Object.assign(a, l);
         t = S.q ? "relevance" === S.sortBy : "name_asc" === S.sortBy;
-        const i = t || !l[S.sortBy] ? "" : `
+        const a = t || !l[S.sortBy] ? "" : `
                 <div class="flex items-center bg-gray-600 text-gray-200 rounded-full pl-3 pr-2 py-1 text-sm">
                     <span class="mr-2">Сортировка: ${l[S.sortBy]}</span>
                 </div>
             `;
-        e = i, o = !t
+        e = a, o = !t
     } else {
         const {
             colorIds: l,
@@ -1253,22 +1242,18 @@ function renderAppliedFilters() {
             relevance: "Релевантность",
             alpha_asc: "Алфавит (А-Я)",
             alpha_desc: "Алфавит (Я-А)",
-            popularity: "Популярность"
-        },
-        s = {
-            [Symbol.iterator]: function*() {
-                yield* Object.entries(this).map(([k, v]) => [k, v])
-            }
+            popularity: "Популярность",
+            qty_desc: "Кол-во (убыв.)",
+            qty_asc: "Кол-во (возр.)"
         };
-        Object.assign(s, r);
         t = S.q ? "relevance" === S.sortBy : "popularity" === S.sortBy;
-        const c = t ? "" : `
+        const s = t ? "" : `
                 <div class="flex items-center bg-gray-600 text-gray-200 rounded-full pl-3 pr-2 py-1 text-sm">
                     <span class="mr-2">Сортировка: ${r[S.sortBy]}</span>
                     <button data-action="remove-filter" data-filter-type="sortBy" class="text-gray-200 hover:bg-gray-500/50 rounded-full p-0.5">${I_X("w-4 h-4")}</button>
                 </div>
             `;
-        e = [c, i, n].filter(Boolean).join(""), o = !t || l.length > 0 || (a && "catalog" === S.view)
+        e = [s, i, n].filter(Boolean).join(""), o = !t || l.length > 0 || (a && "catalog" === S.view)
     }
     return o ? `
             <div class="px-4 pt-2 pb-0">
@@ -1298,7 +1283,8 @@ function renderMainContent() {
                     n.sort((e, t) => t.name.localeCompare(e.name));
                     break;
                 case "popularity":
-                    n.sort((e, t) => t.num_sets - e.num_sets)
+                    n.sort((e, t) => t.num_sets - e.num_sets);
+                    break;
             }
             i = groupParts(n);
             const r = i ? Object.keys(i) : [];
@@ -1340,11 +1326,11 @@ function renderMainContent() {
                     })
                 }
             let filteredParts = e;
-            S.selCollCatId && (filteredParts = e.filter(({
+            S.selCollCatId && (filteredParts = filteredParts.filter(({
                 part: e
             }) => PART_MAP[e.id]?.categoryId === S.selCollCatId));
-            S.filters.colorIds?.length > 0 && (filteredParts = e.filter(e => S.filters.colorIds.includes(e.color.id)));
-            i && (filteredParts = e.filter(({
+            S.filters.colorIds?.length > 0 && (filteredParts = filteredParts.filter(e => S.filters.colorIds.includes(e.color.id)));
+            i && (filteredParts = filteredParts.filter(({
                 part: e
             }) => e.name.toLowerCase().includes(i) || e.id.toLowerCase().includes(i)));
             t = filteredParts;
@@ -1356,7 +1342,14 @@ function renderMainContent() {
                     t.sort((e, t) => t.part.name.localeCompare(e.part.name));
                     break;
                 case "popularity":
-                    t.sort((e, t) => (PART_MAP[t.part.id]?.num_sets || 0) - (PART_MAP[e.part.id]?.num_sets || 0))
+                    t.sort((e, t) => (PART_MAP[t.part.id]?.num_sets || 0) - (PART_MAP[e.part.id]?.num_sets || 0));
+                    break;
+                case "qty_asc":
+                    t.sort((e, t) => e.quantity - t.quantity);
+                    break;
+                case "qty_desc":
+                    t.sort((e, t) => t.quantity - e.quantity);
+                    break;
             }
             o = (e, t, o) => renderPartCard(e.part, e.color, e.quantity, t, o);
             n = "grid-cols-[repeat(auto-fill,minmax(130px,1fr))]";
@@ -1421,7 +1414,8 @@ function renderMainContent() {
                     t.sort((e, t) => t.num_parts - e.num_parts);
                     break;
                 case "num_parts_asc":
-                    t.sort((e, t) => t.num_parts - e.num_parts)
+                    t.sort((e, t) => t.num_parts - e.num_parts);
+                    break;
             }
             o = (e, t, o) => renderMinifigCard(e, t, o);
         }
@@ -1977,7 +1971,7 @@ function renderFilterModal() {
                 </div>
             `
     } else {
-        const t = [{
+        const sortOptions = [{
             id: "relevance",
             name: "Релевантность",
             desc: "Поиск"
@@ -1993,7 +1987,19 @@ function renderFilterModal() {
             id: "alpha_desc",
             name: "Алфавит (Я-А)",
             desc: ""
-        }].map(e => {
+        }];
+        if (S.view === 'collection') {
+            sortOptions.push({
+                id: "qty_desc",
+                name: "Кол-во в коллекции (убыв.)",
+                desc: ""
+            }, {
+                id: "qty_asc",
+                name: "Кол-во в коллекции (возр.)",
+                desc: ""
+            });
+        }
+        const t = sortOptions.map(e => {
             const t = tempFilters.sortBy === e.id,
                 o = "relevance" === e.id && !S.q || "popularity" === e.id && S.q,
                 l = S.q && "relevance" === e.id || !S.q && "popularity" === e.id ? '<span class="ml-2 text-xs bg-blue-600/50 text-blue-300 px-1.5 py-0.5 rounded-full">По умолч.</span>' : "";
@@ -2308,7 +2314,7 @@ function renderMinifigModalDetailsView() {
     return `
         <div class="flex flex-col lg:flex-row">
             <div class="lg:w-1/2 p-4 sm:p-6 bg-gray-900/30 flex items-center justify-center flex-shrink-0 border-b lg:border-b-0 lg:border-r border-gray-700">
-                 <div data-action="view-image-fullscreen" data-image-url="${e.set_img_url||""}" class="w-48 h-48 sm:w-64 sm-h-64 bg-white rounded-lg flex items-center justify-center overflow-hidden shadow-lg relative cursor-pointer group">
+                 <div data-action="view-image-fullscreen" data-image-url="${e.set_img_url||""}" class="w-48 h-48 sm:w-64 sm:h-64 bg-white rounded-lg flex items-center justify-center overflow-hidden shadow-lg relative cursor-pointer group">
                     <img ${getPartImageUrl(e.set_img_url)} alt="${e.name}" class="max-w-full max-h-full object-contain">
                      <div class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                        ${I_Search("w-10 h-10 text-white")}
@@ -2469,14 +2475,14 @@ function generateCsvData() {
     return o;
 }
 async function exportCollectionAndCacheToZip() {
-    const setStatus = updateSettingsStatus;
+    const setStatus = (status, type) => updateSettingsStatus(status, type, 0);
 
     try {
-        setStatus("Начало полного экспорта. Это может занять несколько минут...");
+        setStatus("Начало полного экспорта. Это может занять несколько минут...", 'info');
         await new Promise(r => setTimeout(r, 100)); 
 
         
-        setStatus("Сбор данных о коллекции...");
+        setStatus("Сбор данных о коллекции...", 'info');
         const setsToProcess = new Set(Object.keys(S.setColl));
         const minifigsToProcess = new Set(Object.keys(S.minifigColl));
         const partsToProcess = new Set();
@@ -2487,7 +2493,7 @@ async function exportCollectionAndCacheToZip() {
         const totalSets = setsToProcess.size;
         for (const setNum of setsToProcess) {
             processedCount++;
-            setStatus(`Обработка наборов: ${processedCount}/${totalSets} (${setNum})`);
+            setStatus(`Обработка наборов: ${processedCount}/${totalSets} (${setNum})`, 'info');
 
             if (!SET_MAP[setNum]?.name) await fetchMissingCollectionSetDetails();
 
@@ -2504,7 +2510,7 @@ async function exportCollectionAndCacheToZip() {
         const totalMinifigs = minifigsToProcess.size;
         for (const figNum of minifigsToProcess) {
             processedCount++;
-            setStatus(`Обработка минифигурок: ${processedCount}/${totalMinifigs} (${figNum})`);
+            setStatus(`Обработка минифигурок: ${processedCount}/${totalMinifigs} (${figNum})`, 'info');
 
             if (!MINIFIG_MAP[figNum]?.name) await fetchMinifigDetails(figNum);
 
@@ -2518,7 +2524,7 @@ async function exportCollectionAndCacheToZip() {
         const missingPartDetails = allParts.filter(p => !PART_MAP[p]?.name);
         if (missingPartDetails.length > 0) {
             for (let i = 0; i < missingPartDetails.length; i += 100) {
-                setStatus(`Загрузка данных о деталях... (${i}/${missingPartDetails.length})`);
+                setStatus(`Загрузка данных о деталях... (${i}/${missingPartDetails.length})`, 'info');
                 const batch = missingPartDetails.slice(i, i + 100);
                 try {
                     (await apiFetchPaginated(`/parts/?part_nums=${batch.join(",")}`)).map(procPart);
@@ -2532,7 +2538,7 @@ async function exportCollectionAndCacheToZip() {
         processedCount = 0;
         for (const partNum of allParts) {
             processedCount++;
-            setStatus(`Загрузка данных о цветах деталей: ${processedCount}/${allParts.length} (${partNum})`);
+            setStatus(`Загрузка данных о цветах деталей: ${processedCount}/${allParts.length} (${partNum})`, 'info');
             if (!PART_MAP[partNum] || !PART_MAP[partNum].colorImages) {
                 await fetchColorDetailsForPart(partNum);
                 await new Promise(r => setTimeout(r, 200)); 
@@ -2540,7 +2546,7 @@ async function exportCollectionAndCacheToZip() {
         }
 
         
-        setStatus("Сбор URL-адресов изображений...");
+        setStatus("Сбор URL-адресов изображений...", 'info');
         const imageUrls = new Set();
         setsToProcess.forEach(setNum => SET_MAP[setNum]?.set_img_url && imageUrls.add(SET_MAP[setNum].set_img_url));
         minifigsToProcess.forEach(figNum => MINIFIG_MAP[figNum]?.set_img_url && imageUrls.add(MINIFIG_MAP[figNum].set_img_url));
@@ -2555,15 +2561,15 @@ async function exportCollectionAndCacheToZip() {
         });
 
         
-        await ensureUrlsAreCached([...imageUrls], setStatus);
+        await ensureUrlsAreCached([...imageUrls], (msg) => setStatus(msg, 'info'));
 
         
-        setStatus("Экспорт коллекции в CSV...");
+        setStatus("Экспорт коллекции в CSV...", 'info');
         const zip = new JSZip();
         const csvData = generateCsvData();
         zip.file("collection.csv", csvData);
 
-        setStatus("Чтение данных из кеша...");
+        setStatus("Чтение данных из кеша...", 'info');
         const cache = await caches.open(CACHE_NAME);
         const requests = await cache.keys();
         const manifest = [];
@@ -2589,7 +2595,7 @@ async function exportCollectionAndCacheToZip() {
         }
         zip.file("cache_manifest.json", JSON.stringify(manifest));
 
-        setStatus(`Создание ZIP архива... (Найдено ${manifest.length} записей в кеше)`);
+        setStatus(`Создание ZIP архива... (Найдено ${manifest.length} записей в кеше)`, 'info');
         const zipBlob = await zip.generateAsync({
             type: "blob"
         });
@@ -2602,11 +2608,11 @@ async function exportCollectionAndCacheToZip() {
         document.body.removeChild(link);
         URL.revokeObjectURL(link.href);
 
-        setStatus("Экспорт успешно завершен!", "success", 5000);
+        updateSettingsStatus("Экспорт успешно завершен!", "success", 5000);
 
     } catch (e) {
         console.error("Full ZIP Export failed:", e);
-        setStatus(`Ошибка экспорта: ${e.message}`, "error");
+        updateSettingsStatus(`Ошибка экспорта: ${e.message}`, "error");
     }
 }
 async function processCsvData(content) {
@@ -3528,32 +3534,26 @@ document.addEventListener("click", async e => {
                 handleUpdateMinifigCollection(S.selFigNum, S.minifigModal.qty, !0);
                 break;
             case "delete-from-minifig-collection-modal":
-                handleUpdateMinifigCollection(S.selFigNum, 0, !1);
+                handleUpdateMinifigCollection(S.selFigNum, 0, !0);
                 break;
             case "toggle-minifig-modal-view":
                 S.minifigModal.view = "details" === S.minifigModal.view ? "inventory" : "details";
-                if ("inventory" === S.minifigModal.view && !S.minifigModal.inv) {
+                if ("inventory" === S.minifigModal.view && !S.minifigModal.inv && !S.minifigModal.loadingInv && !S.minifigModal.invError) {
                     S.minifigModal.loadingInv = !0, updateMinifigModalView();
-                    try {
-                        S.minifigModal.inv = await fetchMinifigParts(S.selFigNum);
-                    } catch (l) {
-                        S.minifigModal.invError = !0
-                    } finally {
-                        S.minifigModal.loadingInv = !1
-                    }
-                }
-                updateMinifigModalView();
+                    fetchMinifigParts(S.selFigNum).then(e => {
+                        S.minifigModal.inv = e, S.minifigModal.invError = !1
+                    }).catch(() => S.minifigModal.invError = !0).finally(() => {
+                        S.minifigModal.loadingInv = !1, S.selFigNum && updateMinifigModalView()
+                    })
+                } else renderMinifigModal();
                 break;
             case "retry-load-minifig-inv":
-                S.minifigModal.loadingInv = !0, S.minifigModal.invError = !1, updateMinifigModalView(), (async () => {
-                    try {
-                        S.minifigModal.inv = await fetchMinifigParts(S.selFigNum)
-                    } catch (e) {
-                        S.minifigModal.invError = !0
-                    } finally {
-                        S.minifigModal.loadingInv = !1, updateMinifigModalView()
-                    }
-                })();
+                if (S.selFigNum) {
+                    S.minifigModal.loadingInv = !0, S.minifigModal.invError = !1, updateMinifigModalView();
+                    fetchMinifigParts(S.selFigNum).then(e => S.minifigModal.inv = e).catch(() => S.minifigModal.invError = !0).finally(() => {
+                        S.minifigModal.loadingInv = !1, S.selFigNum && updateMinifigModalView()
+                    })
+                }
                 break;
             case "add-minifig-parts-modal":
                 await handleBulkAddMinifigPartsFromModal(S.selFigNum);
@@ -3561,24 +3561,9 @@ document.addEventListener("click", async e => {
         }
         return
     }
-    const y = t.closest('[data-action="go-to-category"]');
-    if (y?.dataset.categoryId) return S.selCatId = parseInt(y.dataset.categoryId, 10), S.view = "catalog", S.q = "", S.filters = {
-        colorIds: [],
-        inCollectionOnly: !1
-    }, S.sortBy = "popularity", closeModal(), void loadPartsForCategory(S.selCatId);
-    if (!partModalEl?.contains(t)) return;
-    const p = t.closest("[data-color-id]");
-    if (p?.dataset.colorId) {
-        const e = p.dataset.colorId;
-        S.partModal.selColorId !== e && (S.partModal.selColorId = e, S.partModal.qty = S.coll[S.selPartId]?.[e] || 1, fetchPartColorSpecifics(S.selPartId, e), updateModalControlsState(), updateModalPartially({
-            colors: !0
-        }))
-    } else {
+    if (partModalEl?.contains(t)) {
         const e = t.closest("[data-action]");
         if (e) switch (e.dataset.action) {
-            case "retry-fetch-colors":
-                fetchPartColors(S.selPartId);
-                break;
             case "decrease-qty":
                 S.partModal.qty = Math.max(1, S.partModal.qty - 1), updateModalControlsState();
                 break;
@@ -3586,77 +3571,65 @@ document.addEventListener("click", async e => {
                 S.partModal.qty = Math.min(9999, S.partModal.qty + 1), updateModalControlsState();
                 break;
             case "update-collection":
-                S.selPartId && S.partModal.selColorId && await handleUpdateCollection(S.selPartId, S.partModal.selColorId, S.partModal.qty);
+                if (S.selPartId && S.partModal.selColorId) {
+                    const e = S.coll[S.selPartId]?.[S.partModal.selColorId] || 0;
+                    await handleUpdateCollection(S.selPartId, S.partModal.selColorId, e + S.partModal.qty), S.partModal.qty = 1
+                }
                 break;
             case "delete-from-collection-modal":
-                S.selPartId && S.partModal.selColorId && await handleUpdateCollection(S.selPartId, S.partModal.selColorId, 0);
+                S.selPartId && S.partModal.selColorId && (await handleUpdateCollection(S.selPartId, S.partModal.selColorId, 0), S.partModal.qty = 1);
+                break;
+            case "go-to-category":
+                const t = parseInt(e.dataset.categoryId, 10);
+                S.view = "catalog", S.subView = "parts", S.q = "", S.selCatId = t, S.filters = {
+                    colorIds: [],
+                    inCollectionOnly: !1
+                }, S.sortBy = "popularity", closeModal(), await loadPartsForCategory(t);
+                break;
+            case "retry-fetch-colors":
+                S.selPartId && fetchPartColors(S.selPartId);
                 break
         }
+        const o = t.closest("[data-color-id]");
+        if (o) {
+            S.partModal.selColorId = o.dataset.colorId, S.partModal.qty = S.coll[S.selPartId]?.[S.partModal.selColorId] || 1, updateModalPartially({
+                colors: !0,
+                controls: !0
+            }), fetchPartColorSpecifics(S.selPartId, S.partModal.selColorId)
+        }
+        const l = t.closest("#variation-select");
+        l && l.value !== S.selPartId && openModalForPart(l.value, S.partModal.groupId, S.partModal.variants)
     }
 });
-document.addEventListener("change", e => {
-    if ("variation-select" !== e.target?.id) return;
-    const t = e.target.value;
-    if (t !== S.selPartId) {
-        const e = S.partModal.variants,
-            o = getGroupId(t);
-        openModalForPart(t, o, e)
-    }
-});
-document.addEventListener("keyup", e => {
-    "Escape" === e.key && (viewerEl.classList.contains("visible") ? closeImageViewer() : S.selPartId ? closeModal() : S.selSetNum ? closeSetModal() : S.selFigNum ? closeMinifigModal() : S.filterOpen ? closeFilterModal() : S.settingsOpen && closeSettingsModal())
-});
-let searchTimeout;
 document.addEventListener("input", e => {
+    if (!(e.target instanceof HTMLInputElement)) return;
     const t = e.target;
     if ("search-input" === t.id) {
-        S.q = t.value, document.getElementById("clear-search")?.classList.toggle("hidden", !S.q), clearTimeout(searchTimeout), searchTimeout = setTimeout(() => {
-            triggerSearch()
-        }, 300)
-    } else if (filterModalEl?.contains(t)) {
+        S.q = t.value;
+        const e = document.getElementById("clear-search");
+        e?.classList.toggle("hidden", !S.q)
+    }
+    if (t.closest("#filter-modal-content")) {
         const e = t.dataset.filterKey;
-        e && (tempFilters.setFilters[e] = t.value)
+        e && tempFilters.setFilters.hasOwnProperty(e) && (tempFilters.setFilters[e] = t.value)
     }
 });
-let scrollTimeout;
+document.addEventListener("keydown", e => {
+    "Enter" === e.key && "search-input" === e.target.id && triggerSearch()
+});
 mainEl.addEventListener("scroll", () => {
-    if (!scrollTimeout) {
-        scrollTimeout = setTimeout(() => {
-            const {
-                scrollTop: e,
-                scrollHeight: t,
-                clientHeight: o
-            } = mainEl;
-            e + o >= t - 300 && S.hasMoreItems && !S.loading && (S.toDisplay += S.increment, S.gridStale = !1, renderMainContent()), e > 300 ? (toTopBtn.classList.remove("opacity-0", "pointer-events-none", "translate-y-4")) : (toTopBtn.classList.add("opacity-0", "pointer-events-none", "translate-y-4")), scrollTimeout = null
-        }, 100)
+    S.hasMoreItems && !S.loading && mainEl.scrollTop + mainEl.clientHeight >= mainEl.scrollHeight - 300 && (S.toDisplay += S.increment, renderMainContent()), mainEl.scrollTop > 200 ? toTopBtn.classList.remove("opacity-0", "pointer-events-none", "translate-y-4") : toTopBtn.classList.add("opacity-0", "pointer-events-none", "translate-y-4")
+});
+document.getElementById("import-zip-input").addEventListener("change", async e => {
+    if (e.target.files.length > 0) {
+        const t = e.target.files[0];
+        await importCollectionAndCacheFromZip(t), e.target.value = ""
     }
 });
-async function initApp() {
-    updateUI(), S.sidebarLoading = !0, renderSidebar();
-    const e = [fetchCategories(), fetchThemes(), fetchAllColors()];
-    await Promise.allSettled(e), S.sidebarLoading = !1, S.err && updateUI(), updateUI();
-    const t = [fetchMissingCollectionPartDetails(), fetchMissingCollectionSetDetails(), fetchMissingCollectionMinifigDetails()];
-    await Promise.allSettled(t), await fetchColorDetailsForCollectionParts(), "collection" === S.view && (S.gridStale = !0), updateUI()
+async function initializeApp() {
+    S.sidebarLoading = !0, updateUI(), loadState(), await Promise.all([fetchCategories(), fetchAllColors(), fetchThemes()]), S.sidebarLoading = !1, updateUI(), await fetchMissingCollectionPartDetails(), await fetchMissingCollectionSetDetails(), await fetchMissingCollectionMinifigDetails(), await fetchColorDetailsForCollectionParts(), S.gridStale = !0, updateUI()
 }
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/service-worker.js').then(registration => {
-            console.log('SW registered: ', registration);
-        }).catch(registrationError => {
-            console.log('SW registration failed: ', registrationError);
-        });
-    });
-}
-const importZipInput = document.getElementById('import-zip-input');
-importZipInput.addEventListener('change', (event) => {
-    const file = event.target.files[0];
-    if (file) {
-        importCollectionAndCacheFromZip(file);
-    }
-    event.target.value = '';
-});
-loadState();
-initApp();
+initializeApp();
 </script>
 </body>
 </html>
