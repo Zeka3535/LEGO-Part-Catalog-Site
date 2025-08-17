@@ -2395,8 +2395,13 @@ async function exportCollectionAndCacheToZip() {
         const requests = await cache.keys();
         const manifest = [];
         const cacheFolder = zip.folder("cache_data");
+        const IMG_HOSTS = ['cdn.rebrickable.com', 'm.rebrickable.com'];
         for (let i = 0; i < requests.length; i++) {
             const request = requests[i];
+            const url = new URL(request.url);
+            if (IMG_HOSTS.includes(url.hostname)) {
+                continue;
+            }
             const response = await cache.match(request);
             if (response && response.ok) {
                 const blob = await response.blob();
@@ -2404,11 +2409,11 @@ async function exportCollectionAndCacheToZip() {
                 response.headers.forEach((value, key) => {
                     headers[key] = value;
                 });
-                const filePath = `cache_data/r_${i}`;
-                cacheFolder.file(`r_${i}`, blob);
+                const filePath = `r_${i}`;
+                cacheFolder.file(filePath, blob);
                 manifest.push({
                     url: request.url,
-                    path: filePath,
+                    path: `cache_data/${filePath}`,
                     headers: headers
                 });
             }
@@ -2611,16 +2616,16 @@ async function handleUpdateCollection(e, t, o) {
 }
 
 function handleUpdateSetCollection(e, t) {
-    t > 0 ? S.setColl[e] = {
+    const o = (S.setColl[e]?.qty || 0) > 0;
+    t > 0 ? (S.setColl[e] = {
         qty: t
-    } : delete S.setColl[e], saveState(), S.gridStale = !0, "collection" === S.view ? updateUI() : (renderSidebar(), mainEl.querySelector(`.set-card[data-set-num="${e}"]`)?.prepend(function() {
+    }, o || (console.log(`Proactively fetching data for new set in collection: ${e}`), fetchAllSetInventory(e).catch(t => console.error(`Failed to proactively fetch inventory for ${e}`, t)), fetchSetMinifigs(e).catch(t => console.error(`Failed to proactively fetch minifigs for ${e}`, t)))) : delete S.setColl[e], saveState(), S.gridStale = !0, "collection" === S.view ? updateUI() : (renderSidebar(), mainEl.querySelector(`.set-card[data-set-num="${e}"]`)?.prepend(function() {
         if (t > 0) {
-            let e = document.createElement("div");
-            e.className = "absolute top-3 right-3 bg-blue-600 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center z-10 shadow-md", e.textContent = String(t), e
+            let o = document.createElement("div");
+            return o.className = "absolute top-3 right-3 bg-blue-600 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center z-10 shadow-md", o.textContent = String(t), o
         }
-        return document.createDocumentFragment();
-    }()));
-    S.selSetNum === e && updateSetModalControlsState()
+        return document.createDocumentFragment()
+    }())), S.selSetNum === e && updateSetModalControlsState()
 }
 async function handleUpdateMinifigCollection(e, t, o = !0) {
     const l = S.minifigColl[e]?.qty || 0,
@@ -3140,7 +3145,7 @@ document.addEventListener("click", async e => {
         }
         return void refreshWithNewFilters();
     }
-    if (settingsModalEl?.contains(t)) {
+     if (settingsModalEl?.contains(t)) {
         const e = t.closest("[data-action]");
         if (!e) return;
         switch (e.dataset.action) {
