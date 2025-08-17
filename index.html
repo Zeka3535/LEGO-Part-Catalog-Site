@@ -793,7 +793,7 @@ async function handleFeelingLucky() {
 
 function getPartImageUrl(e) {
     const t = `data:image/svg+xml,${encodeURIComponent(I_Img("w-full h-full text-gray-500"))}`;
-    return e ? `src="${e}" crossorigin="anonymous" onerror="this.onerror=null; this.src='${t}';"` : `src="${t}"`
+    return e ? `src="${e}" onerror="this.onerror=null; this.src='${t}';"` : `src="${t}"`;
 }
 
 function sortColorIds(e, t) {
