@@ -50,9 +50,7 @@ self.addEventListener('fetch', event => {
         return;
     }
 
-    if (url.hostname === API_HOST) {
-        event.respondWith(networkFallingBackToCache(event.request));
-    } else if (IMG_HOSTS.includes(url.hostname)) {
+    if (url.hostname === API_HOST || IMG_HOSTS.includes(url.hostname)) {
         event.respondWith(cacheFirst(event.request));
     } else {
         event.respondWith(
@@ -82,24 +80,4 @@ function cacheFirst(request) {
             return networkResponse;
         });
     });
-}
-
-function networkFallingBackToCache(request) {
-    // Сначала пытаемся получить данные из сети
-    return fetch(request)
-        .then(networkResponse => {
-            // Если запрос успешен, обновляем кэш и возвращаем ответ
-            if (networkResponse.ok) {
-                const responseToCache = networkResponse.clone();
-                caches.open(CACHE_NAME).then(cache => {
-                    cache.put(request, responseToCache);
-                });
-            }
-            return networkResponse;
-        })
-        .catch(() => {
-            // Если запрос к сети не удался (офлайн, ошибка CORS и т.д.),
-            // пытаемся найти ответ в кэше.
-            return caches.match(request);
-        });
 }
