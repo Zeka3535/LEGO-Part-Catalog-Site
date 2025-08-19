@@ -589,7 +589,7 @@ async function fetchMinifigs() {
         } else if (S.sortBy === "num_parts_desc") {
             results.sort((a, b) => (b.num_parts || 0) - (a.num_parts || 0));
         } else if (S.sortBy === "num_parts_asc") {
-            results.sort((a, b) => (a.num_parts || 0) - (b.num_parts || 0));
+            results.sort((a, b) => (a.num_parts || 0) - (a.num_parts || 0));
         }
         
         console.log(`Loaded ${results.length} minifigs from CSV data`);
@@ -706,27 +706,172 @@ async function fetchColorDetailsForPart(e) {
             });
         }
         PART_MAP[e].colorImages = o;
+        
         // Force save state after color details are fetched to persist color data immediately
         forceSaveState();
     } catch (t) {
         console.warn(`Could not fetch color details for part ${e}:`, t);
+        // Mark this part as failed to avoid repeated attempts
+        if (!PART_MAP[e]) {
+            PART_MAP[e] = { id: e };
+        }
+        PART_MAP[e].colorImages = {}; // Empty object to prevent retry
     }
 }
+
+// Function to ensure basic part images are loaded for collection items
+async function ensureBasicPartImagesForCollection() {
+    const partsNeedingImages = Object.keys(S.coll).filter(partId => {
+        const part = PART_MAP[partId];
+        // Only process parts that have NO image URL at all
+        // This should be very rare since inventory_parts.csv should provide images
+        return part && !part.part_img_url;
+    });
+    
+    if (partsNeedingImages.length === 0) {
+        console.log('All collection parts already have images from inventory_parts.csv');
+        return;
+    }
+    
+    console.log(`Ensuring basic images for ${partsNeedingImages.length} parts in collection...`);
+    
+    // Process all parts immediately without API calls
+    partsNeedingImages.forEach(partId => {
+        const part = PART_MAP[partId];
+        if (part && !part.part_img_url) {
+            // Generate fallback image URL only if no image exists
+            part.part_img_url = `https://cdn.rebrickable.com/media/parts/${partId}.jpg`;
+            part.rebrickable_img_url = part.part_img_url;
+            console.log(`Generated fallback image for part ${partId}: ${part.part_img_url}`);
+        }
+    });
+    
+    // Save state to persist the image URLs
+    saveState();
+}
+
+// Simplified function to fetch color-specific images
 async function fetchColorDetailsForCollectionParts() {
-    const e = Object.keys(S.coll).filter(e => !PART_MAP[e]?.colorImages && PART_MAP[e]); // Only process parts that exist in PART_MAP
-    if (e.length === 0) return;
-    console.log(`Fetching color-specific images for ${e.length} parts from collection...`);
-    for (let t = 0; t < e.length; t += 3) { // Reduced batch size from 5 to 3
-        const o = e.slice(t, t + 3),
-            l = o.map(e => fetchColorDetailsForPart(e));
-        await Promise.all(l);
-        if (t + 3 < e.length) {
-            await new Promise(e => setTimeout(e, 2e3)); // Increased delay from 1s to 2s
+    // Skip this function if user prefers faster loading over color-specific images
+    if (localStorage.getItem('disableColorSpecificImages') === 'true') {
+        console.log('Skipping color-specific images fetch (disabled by user)');
+        return;
+    }
+    
+    const partsNeedingColorImages = Object.keys(S.coll).filter(partId => {
+        const part = PART_MAP[partId];
+        return part && !part.colorImages && part.part_img_url && part.part_img_url.startsWith('http');
+    });
+    
+    if (partsNeedingColorImages.length === 0) return;
+    
+    console.log(`Fetching color-specific images for ${partsNeedingColorImages.length} parts from collection...`);
+    
+    // Process all parts in small batches to avoid rate limiting
+    for (let i = 0; i < partsNeedingColorImages.length; i += 3) {
+        const batch = partsNeedingColorImages.slice(i, i + 3);
+        await Promise.all(batch.map(partId => fetchColorDetailsForPart(partId)));
+        
+        // Add delay between batches to avoid rate limiting
+        if (i + 3 < partsNeedingColorImages.length) {
+            await new Promise(resolve => setTimeout(resolve, 2000));
         }
     }
-    // Force save state after color details are fetched to persist all color data
+    
+    // Force save state after all color details are fetched
     forceSaveState();
 }
+
+// Helper function to get currently visible part IDs
+function getCurrentlyVisiblePartIds() {
+    const visiblePartCards = document.querySelectorAll('.part-card[data-part-id]');
+    return Array.from(visiblePartCards).map(card => card.dataset.partId);
+}
+
+// Function to load images for currently visible parts (simplified)
+async function loadImagesForVisibleParts() {
+    // This function is now simplified to avoid constant UI updates
+    // It will be called only when explicitly needed
+    return;
+}
+
+// Function to debug part images
+function debugPartImages() {
+    if (S.view !== 'collection' || S.subView !== 'parts') return;
+    
+    console.log('=== DIAGNOSTIC: Part Images Status ===');
+    
+    // Check CSV data
+    console.log('CSV Data Status:');
+    console.log('- Total parts in PART_MAP:', Object.keys(PART_MAP).length);
+    console.log('- Parts with images from inventory_parts.csv:', Object.values(PART_MAP).filter(p => p.part_img_url && p.part_img_url !== `https://cdn.rebrickable.com/media/parts/${p.id}.jpg`).length);
+    console.log('- Parts with fallback images:', Object.values(PART_MAP).filter(p => p.part_img_url === `https://cdn.rebrickable.com/media/parts/${p.id}.jpg`).length);
+    console.log('- Parts with color-specific images:', Object.values(PART_MAP).filter(p => p.colorImages && Object.keys(p.colorImages).length > 0).length);
+    
+    // Check collection parts
+    const collectionParts = Object.keys(S.coll);
+    console.log('Collection Status:');
+    console.log('- Total parts in collection:', collectionParts.length);
+    
+    // Sample some parts for detailed analysis
+    const sampleParts = collectionParts.slice(0, 10);
+    sampleParts.forEach(partId => {
+        const part = PART_MAP[partId];
+        if (part) {
+            console.log(`Part ${partId}:`, {
+                name: part.name,
+                csv_img_url: part.part_img_url,
+                is_fallback: part.part_img_url === `https://cdn.rebrickable.com/media/parts/${partId}.jpg`,
+                has_color_images: !!part.colorImages
+            });
+        }
+    });
+    
+    // Check specific part 57899 if it exists
+    if (PART_MAP['57899']) {
+        console.log('=== DETAILED: Part 57899 ===');
+        console.log(PART_MAP['57899']);
+    }
+    
+    console.log('=== END DIAGNOSTIC ===');
+}
+
+// Function to force refresh part images in collection view
+async function forceRefreshPartImages() {
+    if (S.view !== 'collection' || S.subView !== 'parts') return;
+    
+    const refreshButton = document.getElementById('refresh-images-button');
+    const refreshIcon = document.getElementById('refresh-images-icon');
+    
+    if (!refreshButton || !refreshIcon) return;
+    
+    // Disable button and show loading state
+    refreshButton.disabled = true;
+    refreshIcon.innerHTML = '<div class="loader !w-5 !h-5 !border-2"></div>';
+    
+    try {
+        console.log('Forcing refresh of part images...');
+        
+        // First ensure all parts have basic images
+        await ensureBasicPartImagesForCollection();
+        
+        // Then fetch color-specific images for all parts
+        await fetchColorDetailsForCollectionParts();
+        
+        // Update UI once at the end
+        S.gridStale = true;
+        updateUI();
+        
+        console.log('Part images refresh completed successfully');
+    } catch (error) {
+        console.error('Error refreshing part images:', error);
+    } finally {
+        // Re-enable button and restore icon
+        refreshButton.disabled = false;
+        refreshIcon.innerHTML = I_Refresh("w-5 h-5");
+    }
+}
+
 async function fetchMissingCollectionPartDetails() {
     const e = Object.keys(S.coll).filter(e => !PART_MAP[e] || !PART_MAP[e].name);
     if (e.length === 0) return;
@@ -1034,9 +1179,19 @@ async function handleFeelingLucky() {
 
 function getPartImageUrl(e) {
     const t = `data:image/svg+xml,${encodeURIComponent(I_Img("w-full h-full text-gray-500"))}`;
-    if (!e) return `src="${t}"`;
+    if (!e || typeof e !== 'string' || e.trim() === '') return `src="${t}"`;
     
-    return `src="${e}" onerror="this.onerror=null; this.src='${t}';"`
+    // Accept various types of image URLs
+    const trimmedUrl = e.trim();
+    
+    // Accept HTTP URLs, data URLs, and relative paths
+    if (trimmedUrl.startsWith('http') || trimmedUrl.startsWith('data:') || trimmedUrl.startsWith('./') || trimmedUrl.startsWith('/')) {
+        return `src="${trimmedUrl}" onerror="this.onerror=null; this.src='${t}';"`
+    }
+    
+    // For other cases, try to use the URL as is, but log a warning
+    console.warn('Potentially invalid image URL detected:', trimmedUrl);
+    return `src="${trimmedUrl}" onerror="this.onerror=null; this.src='${t}';"`
 }
 
 // Simple function to handle image load errors (no API calls)
@@ -1255,8 +1410,8 @@ function renderSidebar() {
     sidebarEl.innerHTML = `
         <div class="flex items-center justify-between mb-4 flex-shrink-0">
           <h1 class="text-xl font-bold text-white">Меню</h1>
-          <button id="sidebar-close" class="lg:hidden text-gray-400 hover:text-white p-1">
-            ${I_X("w-6 h-6")}
+          <button id="sidebar-toggle" class="lg:hidden text-gray-300 hover:text-white mr-4 -ml-1 p-1">
+            ${I_Menu("w-6 h-6")}
           </button>
         </div>
 
@@ -1341,6 +1496,7 @@ function renderHeader() {
                     </button>
                     <h1 class="text-xl font-bold text-white hidden sm:block">LEGO® Catalog</h1>
                     <div class="text-xs text-green-400 ml-2 hidden sm:block">(CSV + API)</div>
+                <div class="text-xs text-blue-400 ml-2 hidden sm:block">Изображения: из inventory_parts.csv, fallback по кнопке</div>
                 </div>
                 <div class="flex items-center space-x-2 w-full max-w-sm">
                     <div class="relative flex-grow">
@@ -1353,6 +1509,14 @@ function renderHeader() {
                     <button id="filter-button" class="p-2 bg-gray-600 text-white rounded-md hover:bg-gray-500 transition-colors flex-shrink-0" aria-label="Фильтры">
                         ${I_Filter("w-5 h-5")}
                     </button>
+                    ${S.view === 'collection' && S.subView === 'parts' ? `
+                        <button id="refresh-images-button" class="p-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed" aria-label="Обновить изображения" title="Принудительно обновить изображения деталей">
+                            <span id="refresh-images-icon">${I_Refresh("w-5 h-5")}</span>
+                        </button>
+                        <button id="debug-images-button" class="p-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors flex-shrink-0" aria-label="Диагностика изображений" title="Проверить состояние изображений деталей">
+                            ${I_Search("w-5 h-5")}
+                        </button>
+                    ` : ''}
                 </div>
                 ${loadingIndicator}
             </div>
@@ -1369,7 +1533,7 @@ function renderSetCard(e, t, o = 0) {
                 ${i>0?`<div class="absolute top-3 right-3 bg-blue-600 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center z-10 shadow-md">${i}</div>`:""}
                 <div class="w-full h-40 bg-gray-700 flex items-center justify-center p-2 rounded-t-lg">
                     <div class="w-full h-full bg-white rounded-md flex items-center justify-center overflow-hidden shadow-inner">
-                        <img ${getPartImageUrl(e.set_img_url)} alt="${e.name}" class="w-full h-full object-contain pointer-events-none" loading="lazy" />
+                        <img ${getPartImageUrl(e.set_img_url && e.set_img_url.startsWith('http') ? e.set_img_url : null)} alt="${e.name}" class="w-full h-full object-contain pointer-events-none" loading="lazy" />
                     </div>
                 </div>
                 <div class="p-4 space-y-1">
@@ -1403,7 +1567,7 @@ function renderMinifigCard(e, t, o = 0) {
                 ${i>0?`<div class="absolute top-3 right-3 bg-blue-600 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center z-10 shadow-md">${i}</div>`:""}
                 <div class="w-full h-40 bg-gray-700 flex items-center justify-center p-2 rounded-t-lg">
                     <div class="w-full h-full bg-white rounded-md flex items-center justify-center overflow-hidden shadow-inner">
-                        <img ${getPartImageUrl(e.minifig_img_url || e.set_img_url)} alt="${e.name}" class="w-full h-full object-contain pointer-events-none" loading="lazy" />
+                        <img ${getPartImageUrl((e.minifig_img_url && e.minifig_img_url.startsWith('http')) || (e.set_img_url && e.set_img_url.startsWith('http')) ? (e.minifig_img_url || e.set_img_url) : null)} alt="${e.name}" class="w-full h-full object-contain pointer-events-none" loading="lazy" />
                     </div>
                 </div>
                 <div class="p-4 space-y-1">
@@ -1423,10 +1587,36 @@ function renderPartCard(e, t, o, l, a = 0) {
         s = l ? `animation-delay: ${Math.min(40*a,1500)}ms;` : "";
     let c = "";
     o > 0 && (c = `<div class="absolute top-3 ${i?"left-3":"right-3"} bg-blue-600 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center z-10 shadow-md">${o}</div>`);
-    let d = e.rebrickable_img_url;
-    if (i && t) {
-        const o = PART_MAP[e.id]?.colorImages?.[t.id];
-        o && (d = o)
+    // FIXED: Now properly uses part_img_url from inventory_parts.csv as primary image source
+    let d = e.part_img_url || e.rebrickable_img_url;
+    
+    // Only try to get color-specific images if the feature is enabled and available
+    if (i && t && localStorage.getItem('disableColorSpecificImages') !== 'true') {
+        const colorImage = PART_MAP[e.id]?.colorImages?.[t.id];
+        if (colorImage && colorImage.startsWith('http')) {
+            d = colorImage;
+        }
+    }
+    
+    // Ensure we have a valid image URL - but don't overwrite existing ones
+    if (!d || typeof d !== 'string' || !d.startsWith('http')) {
+        // Only use fallback if no image exists at all
+        if (!e.part_img_url && !e.rebrickable_img_url) {
+            d = `https://cdn.rebrickable.com/media/parts/${e.id}.jpg`;
+        } else {
+            // Use existing image even if it's not HTTP (could be data: URL or relative path)
+            d = e.part_img_url || e.rebrickable_img_url;
+        }
+    }
+    
+    // Log which image URL is being used for debugging
+    if (e.id === '57899') {
+        console.log(`Part ${e.id} image selection:`, {
+            original: e.part_img_url,
+            rebrickable: e.rebrickable_img_url,
+            colorSpecific: PART_MAP[e.id]?.colorImages?.[t?.id],
+            final: d
+        });
     }
     const tHtml = t ? `
         <div class="flex items-center pt-1 pointer-events-none">
@@ -1749,6 +1939,15 @@ function renderMainContent() {
             renderMainContent();
         }
     });
+    
+    // Removed automatic image loading to prevent constant UI updates
+}
+
+// Add scroll event listener for automatic image loading (simplified)
+function setupScrollListener() {
+    // This function is now simplified to avoid constant UI updates
+    // Scroll events will not trigger automatic image loading
+    return;
 }
 
 function renderSetCollectionControls() {
@@ -1939,8 +2138,8 @@ function renderSetInventory() {
         return `
                     <div class="bg-gray-700/50 rounded-lg overflow-hidden">
                         <div class="flex items-center p-2 gap-3 text-sm">
-                            <div data-action="view-image-fullscreen" data-image-url="${e.set_img_url||""}" class="w-12 h-12 bg-white rounded-md flex items-center justify-center flex-shrink-0 cursor-pointer group relative">
-                                <img ${getPartImageUrl(e.set_img_url)} alt="${l}" class="w-full h-full object-contain p-1">
+                            <div data-action="view-image-fullscreen" data-image-url="${e.minifig_img_url||e.set_img_url||""}" class="w-12 h-12 bg-white rounded-md flex items-center justify-center flex-shrink-0 cursor-pointer group relative">
+                                <img ${getPartImageUrl(e.minifig_img_url || e.set_img_url)} alt="${l}" class="w-full h-full object-contain p-1">
                                 <div class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                                     ${I_Search("w-5 h-5 text-white")}
                                 </div>
@@ -2404,12 +2603,20 @@ function renderSettingsModal() {
                          ${t?`<div id="import-export-status" class="mb-2 p-2 text-sm rounded-md ${c}">${t}</div>`:'<div id="import-export-status" class="mb-2"></div>'}
                         <div class="bg-gray-900/50 rounded-lg p-3 space-y-3">
                             <p class="text-xs text-gray-400">Сохраните вашу коллекцию и кеш (изображения, данные) в .zip файл или загрузите их. Импорт объединит данные с вашей текущей коллекцией.</p>
-                            <div class="flex gap-3">
+                            <div class="flex gap-3 mb-3">
                                 <button data-action="import-zip" class="w-full flex items-center justify-center px-3 py-2 text-sm font-semibold rounded-md transition-colors duration-150 bg-blue-600 hover:bg-blue-700 text-white">
                                     ${I_Up("w-5 h-5 mr-2")} Импорт (.zip)
                                 </button>
                                 <button data-action="export-zip" class="w-full flex items-center justify-center px-3 py-2 text-sm font-semibold rounded-md transition-colors duration-150 bg-green-600 hover:bg-green-700 text-white">
                                     ${I_Down("w-5 h-5 mr-2")} Экспорт (.zip)
+                                </button>
+                            </div>
+                            <div class="flex gap-3">
+                                <button data-action="import-csv" class="w-full flex items-center justify-center px-3 py-2 text-sm font-semibold rounded-md transition-colors duration-150 bg-purple-600 hover:bg-purple-700 text-white">
+                                    ${I_Up("w-5 h-5 mr-2")} Импорт (.csv)
+                                </button>
+                                <button data-action="export-csv" class="w-full flex items-center justify-center px-3 py-2 text-sm font-semibold rounded-md transition-colors duration-150 bg-orange-600 hover:bg-orange-700 text-white">
+                                    ${I_Down("w-5 h-5 mr-2")} Экспорт (.csv)
                                 </button>
                             </div>
                         </div>
@@ -2466,6 +2673,20 @@ function renderSettingsModal() {
                             <button data-action="force-reload-csv" class="w-full flex items-center justify-center px-3 py-2 text-sm font-semibold rounded-md transition-colors duration-150 bg-orange-600 hover:bg-orange-700 text-white">
                                 ${I_Refresh("w-5 h-5 mr-2")} Принудительно перезагрузить CSV
                             </button>
+                        </div>
+                    </div>
+                    <div>
+                        <h3 class="text-md font-semibold text-gray-300 mb-2">Производительность</h3>
+                        <div class="bg-gray-900/50 rounded-lg p-3 space-y-3">
+                            <p class="text-xs text-gray-400">Настройки для улучшения производительности загрузки</p>
+                            <div class="flex items-center justify-between">
+                                <span class="text-sm text-gray-300">Отключить загрузку изображений для каждого цвета</span>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="disable-color-images" class="sr-only peer" ${localStorage.getItem('disableColorSpecificImages') === 'true' ? 'checked' : ''}>
+                                    <div class="w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                </label>
+                            </div>
+                            <p class="text-xs text-gray-400">Отключение ускорит загрузку коллекции, но детали будут отображаться в базовом цвете</p>
                         </div>
                     </div>
                     <div>
@@ -2642,12 +2863,19 @@ function renderMinifigModalDetailsView() {
     return `
         <div class="flex flex-col lg:flex-row">
             <div class="lg:w-1/2 p-4 sm:p-6 bg-gray-900/30 flex items-center justify-center flex-shrink-0 border-b lg:border-b-0 lg:border-r border-gray-700">
-                 <div data-action="view-image-fullscreen" data-image-url="${e.set_img_url||""}" class="w-48 h-48 sm:w-64 sm-h-64 bg-white rounded-lg flex items-center justify-center overflow-hidden shadow-lg relative cursor-pointer group">
-                    <img ${getPartImageUrl(e.set_img_url)} alt="${e.name}" class="max-w-full max-h-full object-contain">
+                 <div data-action="view-image-fullscreen" data-image-url="${e.minifig_img_url||e.set_img_url||""}" class="w-48 h-48 sm:w-64 sm:w-64 bg-white rounded-lg flex items-center justify-center overflow-hidden shadow-lg relative cursor-pointer group">
+                    <img ${getPartImageUrl(e.minifig_img_url || e.set_img_url)} alt="${e.name}" class="max-w-full max-h-full object-contain">
                      <div class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                        ${I_Search("w-10 h-10 text-white")}
                     </div>
                  </div>
+                 ${(!e.minifig_img_url && !e.set_img_url) ? `
+                 <div class="mt-3 text-center">
+                     <button data-action="refresh-minifig-image" class="text-xs px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors">
+                         ${I_Refresh("w-4 h-4 inline mr-1")} Обновить изображение
+                     </button>
+                 </div>
+                 ` : ''}
             </div>
             <div class="lg:w-1/2 p-4 sm:p-6 flex flex-col">
                 <div class="space-y-6">
@@ -2807,6 +3035,31 @@ async function exportCollectionAndCacheToZip() {
         renderSettingsModal();
     }
 }
+
+// Function to export collection to CSV
+function exportCollectionToCSV() {
+    try {
+        S.settingsModal.status = "Подготовка CSV файла...", S.settingsModal.statusType = "info", renderSettingsModal();
+        
+        const csvData = generateCsvData();
+        
+        const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = `lego-collection-${new Date().toISOString().slice(0, 10)}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(link.href);
+        
+        S.settingsModal.status = "Экспорт CSV успешно завершен!", S.settingsModal.statusType = "success";
+        renderSettingsModal();
+    } catch (e) {
+        console.error("CSV Export failed:", e);
+        S.settingsModal.status = `Ошибка экспорта CSV: ${e.message}`, S.settingsModal.statusType = "error";
+        renderSettingsModal();
+    }
+}
 async function processCsvData(content) {
     const t = (e, t) => {
         S.settingsModal.status = e, S.settingsModal.statusType = t, renderSettingsModal();
@@ -2946,6 +3199,7 @@ async function importCollectionAndCacheFromZip(file) {
                 fetchMissingCollectionSetDetails(),
                 fetchMissingCollectionMinifigDetails()
             ]);
+            await ensureBasicPartImagesForCollection();
             await fetchColorDetailsForCollectionParts();
             
             S.settingsModal.status = "Импорт и обновление завершены!", S.settingsModal.statusType = "success";
@@ -3090,7 +3344,7 @@ async function handleBulkUpdatePartsFromSet(e, t) {
                 })
             })), e + 3 < n.length && await new Promise(e => setTimeout(e, 1e3))
         }
-        saveState(), forceSaveState(), await Promise.all([fetchMissingCollectionPartDetails(), fetchColorDetailsForCollectionParts(), fetchMissingCollectionMinifigDetails()]);
+        saveState(), forceSaveState(), await Promise.all([fetchMissingCollectionPartDetails(), ensureBasicPartImagesForCollection(), fetchColorDetailsForCollectionParts(), fetchMissingCollectionMinifigDetails()]);
         let r = "";
         "add" === t ? (r = "Детали набора успешно добавлены.", o > 0 && (r += ` ${o} минифигурок и их детали (${l} шт.) также добавлены.`)) : (r = "Детали набора успешно удалены.", a > 0 && (r += ` Также удалены ${a} минифигурок и их детали (${i} шт.).`)), S.setModal.status = r, S.setModal.statusType = "success", setTimeout(() => {
             S.selSetNum && S.setModal.status === r && (S.setModal.status = "", renderSetModal(!1))
@@ -3116,7 +3370,7 @@ async function handleBulkAddMinifigParts(e) {
                 o = String(e.color.id),
                 a = e.quantity * l;
             S.coll[t] || (S.coll[t] = {}), S.coll[t][o] = (S.coll[t][o] || 0) + a
-        }), saveState(), forceSaveState(), await Promise.all([fetchMissingCollectionPartDetails(), fetchColorDetailsForCollectionParts()]);
+        }), saveState(), forceSaveState(), await Promise.all([fetchMissingCollectionPartDetails(), ensureBasicPartImagesForCollection(), fetchColorDetailsForCollectionParts()]);
         const a = `Детали из "${t.name}" (${o.length} видов) добавлены.`;
         S.setModal.status = a, S.setModal.statusType = "success", setTimeout(() => {
             S.selSetNum && S.setModal.status === a && (S.setModal.status = "", renderSetModal(!1))
@@ -3140,7 +3394,7 @@ async function handleBulkAddMinifigPartsFromModal(e) {
                 o = String(e.color.id),
                 l = e.quantity;
             S.coll[t] || (S.coll[t] = {}), S.coll[t][o] = (S.coll[t][o] || 0) + l
-        }), saveState(), forceSaveState(), await Promise.all([fetchMissingCollectionPartDetails(), fetchColorDetailsForCollectionParts()]);
+        }), saveState(), forceSaveState(), await Promise.all([fetchMissingCollectionPartDetails(), ensureBasicPartImagesForCollection(), fetchColorDetailsForCollectionParts()]);
         const l = `Детали из "${t.name}" (${o.length} видов) добавлены.`;
         S.minifigModal.status = l, S.minifigModal.statusType = "success", setTimeout(() => {
             S.selFigNum && S.minifigModal.status === l && (S.minifigModal.status = "", renderMinifigModal(!1))
@@ -3407,7 +3661,7 @@ document.addEventListener("click", async e => {
     if (i?.dataset.view) {
         const e = i.dataset.view;
         if (S.view === e) return;
-        return S.view = e, S.q = "", S.err = null, S.gridStale = !0, S.selCatId = null, S.selCollCatId = null, S.selThemeId = null, S.selCollThemeId = null, void("catalog" === S.view && "minifigs" === S.subView && !S.minifigRes ? fetchMinifigs() : updateUI())
+        return S.view = e, S.q = "", S.err = null, S.gridStale = !0, S.selCatId = null, S.selCollCatId = null, S.selThemeId = null, S.selCollThemeId = null, void("catalog" === S.view && "minifigs" === S.subView && !S.minifigRes ? fetchMinifigs() : (updateUI(), setupScrollListener()))
     }
     const n = t.closest("[data-sub-view]");
     if (n?.dataset.subView) {
@@ -3450,6 +3704,9 @@ document.addEventListener("click", async e => {
         } else {
             updateUI();
         }
+        
+        // Setup scroll listener for automatic image loading
+        setupScrollListener();
         return;
     }
     if (t.closest('[data-action="show-all-collection-items"]')) return "parts" === S.subView && (S.selCollCatId = null), "sets" === S.subView && (S.selCollThemeId = null), S.gridStale = !0, void updateUI();
@@ -3542,6 +3799,12 @@ document.addEventListener("click", async e => {
         };
         return void renderFilterModal();
     }
+    if (t.closest("#refresh-images-button")) {
+        return void forceRefreshPartImages();
+    }
+    if (t.closest("#debug-images-button")) {
+        return void debugPartImages();
+    }
     if (t.closest("#settings-button")) return S.settingsOpen = !0, void renderSettingsModal();
     const h = t.closest('[data-action="remove-filter"]');
     if (h) {
@@ -3579,6 +3842,18 @@ document.addEventListener("click", async e => {
         const e = t.closest("[data-action]");
         if (!e) return;
         switch (e.dataset.action) {
+            case "disable-color-images":
+                const checkbox = document.getElementById('disable-color-images');
+                if (checkbox) {
+                    localStorage.setItem('disableColorSpecificImages', checkbox.checked.toString());
+                    if (checkbox.checked) {
+                        S.settingsModal.status = "Загрузка изображений для каждого цвета отключена. Коллекция будет загружаться быстрее.", S.settingsModal.statusType = "success";
+                    } else {
+                        S.settingsModal.status = "Загрузка изображений для каждого цвета включена.", S.settingsModal.statusType = "success";
+                    }
+                    renderSettingsModal();
+                }
+                break;
             case "delete-all-parts":
                 S.settingsModal.delConfirm = "parts", renderSettingsModal();
                 break;
@@ -3690,6 +3965,12 @@ document.addEventListener("click", async e => {
             case "import-zip":
                 document.getElementById("import-zip-input")?.click();
                 break;
+            case "import-csv":
+                document.getElementById("import-csv-input")?.click();
+                break;
+            case "export-csv":
+                exportCollectionToCSV();
+                break;
         }
     } else if (minifigModalEl?.contains(t)) {
         const e = t.closest("[data-action]");
@@ -3730,6 +4011,16 @@ document.addEventListener("click", async e => {
                 S.minifigModal.inv = null;
                 const o = minifigModalEl.querySelector('[data-action="toggle-minifig-modal-view"]');
                 o?.click();
+                break
+            case "refresh-minifig-image":
+                if (S.selFigNum) {
+                    try {
+                        await fetchMinifigDetails(S.selFigNum);
+                        renderMinifigModal(false);
+                    } catch (error) {
+                        console.error('Failed to refresh minifig image:', error);
+                    }
+                }
                 break
         }
     } else if (setModalEl?.contains(t)) {
@@ -3890,47 +4181,6 @@ document.addEventListener("click", async e => {
             fetchPartColorSpecifics(S.selPartId, S.partModal.selColorId);
         }
     }
-}), document.addEventListener("change", e => {
-    if (!(e.target instanceof Element)) return;
-    const t = e.target;
-    if ("search-input" === t.id) {
-        S.q = t.value;
-        const e = document.getElementById("clear-search");
-        e && e.classList.toggle("hidden", !S.q)
-    } else if ("variation-select" === t.id) {
-        const e = t.value;
-        if (e && e !== S.selPartId) {
-            const t = PART_MAP[e];
-            if (t) {
-                S.selPartId = e;
-                S.partModal.selColorId = null;
-                S.partModal.imgUrl = t.rebrickable_img_url || null;
-                renderModal();
-                if (t.availableColorIds) {
-                    S.partModal.selColorId = sortColorIds(t.availableColorIds, e)[0];
-                    updateModalPartially({
-                        controls: !0
-                    });
-                    fetchPartColorSpecifics(e, S.partModal.selColorId);
-                } else {
-                    fetchPartColors(e);
-                }
-            }
-        }
-    } else if (t.closest("#filter-modal-content")) {
-        if (t.dataset.action === "modal-set-sort") {
-            tempFilters.sortBy = t.value;
-        } else if (t.dataset.action === "modal-toggle-collection") {
-            tempFilters.filters.inCollectionOnly = t.checked;
-        } else if (t.dataset.filterKey && "sets" === S.subView) {
-            tempFilters.setFilters[t.dataset.filterKey] = t.value;
-        }
-        updateFilterModalUI();
-    } else if ("import-zip-input" === t.id) {
-        const o = t.files?.[0];
-        o && importCollectionAndCacheFromZip(o);
-        t.value = ""
-    }
 }), document.addEventListener("keydown", e => {
     const activeElement = document.activeElement;
     "Escape" === e.key ? viewerEl.classList.contains("viewer-hidden") ? S.filterOpen ? closeFilterModal() : S.settingsOpen ? closeSettingsModal() : S.selSetNum ? closeSetModal() : S.selFigNum ? closeMinifigModal() : S.selPartId && closeModal() : closeImageViewer() : "Enter" === e.key && activeElement.id === "search-input" && triggerSearch()
@@ -3977,7 +4227,9 @@ async function initializeApp() {
         try {
             if (Object.keys(S.coll).length > 0) {
                 await fetchMissingCollectionPartDetails();
-                await fetchColorDetailsForCollectionParts();
+                await ensureBasicPartImagesForCollection();
+                // Don't load color-specific images automatically to avoid delays
+                // User can use refresh button if needed
             }
             
             if (Object.keys(S.setColl).length > 0) {
@@ -3996,6 +4248,9 @@ async function initializeApp() {
                 S.gridStale = true;
                 updateUI();
             }
+            
+            // Setup scroll listener for automatic image loading
+            setupScrollListener();
         } catch (e) {
             console.error("Background collection data fetch failed:", e);
         }
@@ -4008,6 +4263,46 @@ document.addEventListener("DOMContentLoaded", () => {
     importInput.id = 'import-zip-input';
     importInput.accept = '.zip';
     importInput.style.display = 'none';
+    
+    // Add event listener for importing ZIP file
+    importInput.addEventListener('change', async (event) => {
+        const file = event.target.files[0];
+        if (file) {
+            try {
+                await importCollectionAndCacheFromZip(file);
+                // Clear input after successful import
+                event.target.value = '';
+            } catch (error) {
+                console.error('Import failed:', error);
+                // Clear input in case of error
+                event.target.value = '';
+            }
+        }
+    });
+    
+    // Add event listener for importing CSV file
+    const csvImportInput = document.getElementById('import-csv-input');
+    if (csvImportInput) {
+        csvImportInput.addEventListener('change', async (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                try {
+                    const content = await file.text();
+                    await processCsvData(content);
+                    // Clear input after successful import
+                    event.target.value = '';
+                    // Update UI
+                    S.gridStale = true;
+                    updateUI();
+                } catch (error) {
+                    console.error('CSV import failed:', error);
+                    // Clear input in case of error
+                    event.target.value = '';
+                }
+            }
+        });
+    }
+    
     document.body.appendChild(importInput);
     initializeApp();
 
@@ -4187,7 +4482,8 @@ async function loadColorsFromCSV() {
         
         lines.forEach(line => {
             if (line.trim()) {
-                const [id, name, rgb, is_trans] = line.split(',').map(field => field.replace(/"/g, ''));
+                const fields = parseCsvLine(line);
+                const [id, name, rgb, is_trans] = fields;
                 if (id && name) {
                     COLOR_MAP[id] = {
                         id: id,
@@ -4217,7 +4513,8 @@ async function loadCategoriesFromCSV() {
         
         lines.forEach(line => {
             if (line.trim()) {
-                const [id, name] = line.split(',').map(field => field.replace(/"/g, ''));
+                const fields = parseCsvLine(line);
+                const [id, name] = fields;
                 if (id && name) {
                     flatCategories.push({
                         id: parseInt(id),
@@ -4249,7 +4546,8 @@ async function loadThemesFromCSV() {
         
         lines.forEach(line => {
             if (line.trim()) {
-                const [id, name, parent_id] = line.split(',').map(field => field.replace(/"/g, ''));
+                const fields = parseCsvLine(line);
+                const [id, name, parent_id] = fields;
                 if (id && name) {
                     const theme = {
                         id: parseInt(id),
@@ -4291,11 +4589,10 @@ async function loadPartsFromCSV() {
         
         lines.forEach(line => {
             if (line.trim()) {
-                const [part_num, name, part_cat_id] = line.split(',').map(field => field.replace(/"/g, ''));
+                const fields = parseCsvLine(line);
+                const [part_num, name, part_cat_id] = fields;
                 if (part_num && name) {
-                    // Generate image URL from part number (Rebrickable format)
-                    const partImgUrl = `https://cdn.rebrickable.com/media/parts/${part_num}.jpg`;
-                    
+                    // Don't set image URL here - it will come from inventory_parts.csv
                     PART_MAP[part_num] = {
                         id: part_num,
                         name: name,
@@ -4303,14 +4600,14 @@ async function loadPartsFromCSV() {
                         part_cat_id: part_cat_id ? parseInt(part_cat_id) : null,
                         categoryId: part_cat_id ? parseInt(part_cat_id) : null,
                         num_sets: 0, // Will be updated from API if needed
-                        part_img_url: partImgUrl,
-                        rebrickable_img_url: partImgUrl
+                        part_img_url: null, // Will be set from inventory_parts.csv
+                        rebrickable_img_url: null
                     };
                 }
             }
         });
         
-        console.log(`Loaded ${Object.keys(PART_MAP).length} parts from CSV with image URLs`);
+        console.log(`Loaded ${Object.keys(PART_MAP).length} parts from CSV (without images)`);
     } catch (error) {
         console.error('Failed to load parts from CSV:', error);
         throw error;
@@ -4326,10 +4623,17 @@ async function loadSetsFromCSV() {
         
         lines.forEach(line => {
             if (line.trim()) {
-                const [set_num, name, year, theme_id, num_parts, img_url] = line.split(',').map(field => field.replace(/"/g, ''));
+                const fields = parseCsvLine(line);
+                const [set_num, name, year, theme_id, num_parts, img_url] = fields;
                 if (set_num && name) {
                     // Use image URL from CSV if available, otherwise generate one
-                    const setImgUrl = img_url || `https://cdn.rebrickable.com/media/sets/${set_num}.jpg`;
+                    let setImgUrl = img_url || `https://cdn.rebrickable.com/media/sets/${set_num}.jpg`;
+                    
+                    // Validate the image URL
+                    if (setImgUrl && (!setImgUrl.startsWith('http') || setImgUrl.includes('localhost'))) {
+                        console.warn('Invalid image URL detected for set', set_num, ':', setImgUrl);
+                        setImgUrl = `https://cdn.rebrickable.com/media/sets/${set_num}.jpg`;
+                    }
                     
                     SET_MAP[set_num] = {
                         set_num: set_num,
@@ -4351,6 +4655,7 @@ async function loadSetsFromCSV() {
 }
 
 // Function to load minifigs from CSV
+// FIXED: Now properly reads img_url field from CSV and uses correct fallback URL
 async function loadMinifigsFromCSV() {
     try {
         const response = await fetch('./Data/minifigs.csv');
@@ -4359,10 +4664,17 @@ async function loadMinifigsFromCSV() {
         
         lines.forEach(line => {
             if (line.trim()) {
-                const [fig_num, name, num_parts, img_url] = line.split(',').map(field => field.replace(/"/g, ''));
+                const fields = parseCsvLine(line);
+                const [fig_num, name, num_parts, img_url] = fields;
                 if (fig_num && name) {
                     // Use image URL from CSV if available, otherwise generate one
-                    const minifigImgUrl = img_url || `https://cdn.rebrickable.com/media/sets/${fig_num}.jpg`;
+                    let minifigImgUrl = img_url || `https://cdn.rebrickable.com/media/minifigs/${fig_num}.jpg`;
+                    
+                    // Validate the image URL
+                    if (minifigImgUrl && (!minifigImgUrl.startsWith('http') || minifigImgUrl.includes('localhost'))) {
+                        console.warn('Invalid image URL detected for minifig', fig_num, ':', minifigImgUrl);
+                        minifigImgUrl = `https://cdn.rebrickable.com/media/minifigs/${fig_num}.jpg`;
+                    }
                     
                     MINIFIG_MAP[fig_num] = {
                         set_num: fig_num, // Using set_num for consistency
@@ -4427,7 +4739,8 @@ async function loadElementsFromCSV() {
         
         lines.forEach(line => {
             if (line.trim()) {
-                const [element_id, part_num, color_id] = line.split(',').map(field => field.replace(/"/g, ''));
+                const fields = parseCsvLine(line);
+                const [element_id, part_num, color_id] = fields;
                 if (element_id && part_num && color_id) {
                     // Store element info for later use
                     if (!PART_MAP[part_num]) {
@@ -4462,7 +4775,8 @@ async function loadInventoriesFromCSV() {
         
         lines.forEach(line => {
             if (line.trim()) {
-                const [inventory_id, part_num, color_id, quantity, is_spare] = line.split(',').map(field => field.replace(/"/g, ''));
+                const fields = parseCsvLine(line);
+                const [inventory_id, part_num, color_id, quantity, is_spare, img_url] = fields;
                 if (inventory_id && part_num && color_id && quantity && is_spare !== 't') {
                     if (!inventoryPartsMap[inventory_id]) {
                         inventoryPartsMap[inventory_id] = [];
@@ -4470,15 +4784,39 @@ async function loadInventoriesFromCSV() {
                     inventoryPartsMap[inventory_id].push({
                         part_num,
                         color_id: parseInt(color_id),
-                        quantity: parseInt(quantity)
+                        quantity: parseInt(quantity),
+                        img_url: img_url || null
                     });
+                    
+                    // Store image URL for this part-color combination
+                    if (img_url && img_url.trim() && img_url.startsWith('http')) {
+                        if (!PART_MAP[part_num]) {
+                            PART_MAP[part_num] = { 
+                                id: part_num, 
+                                name: 'Unknown Part'
+                            };
+                        }
+                        
+                        // Initialize colorImages if it doesn't exist
+                        if (!PART_MAP[part_num].colorImages) {
+                            PART_MAP[part_num].colorImages = {};
+                        }
+                        
+                        // Store the image URL for this specific color
+                        PART_MAP[part_num].colorImages[color_id] = img_url;
+                        
+                        // Also set as default image if none exists
+                        if (!PART_MAP[part_num].part_img_url) {
+                            PART_MAP[part_num].part_img_url = img_url;
+                            PART_MAP[part_num].rebrickable_img_url = img_url;
+                        }
+                    }
                     
                     // Ensure parts and colors exist
                     if (!PART_MAP[part_num]) {
                         PART_MAP[part_num] = { 
                             id: part_num, 
-                            name: 'Unknown Part',
-                            part_img_url: `https://cdn.rebrickable.com/media/parts/${part_num}.jpg`
+                            name: 'Unknown Part'
                         };
                     }
                     if (!COLOR_MAP[color_id]) {
@@ -4499,7 +4837,8 @@ async function loadInventoriesFromCSV() {
         
         setLines.forEach(line => {
             if (line.trim()) {
-                const [inventory_id, set_num, quantity] = line.split(',').map(field => field.replace(/"/g, ''));
+                const fields = parseCsvLine(line);
+                const [inventory_id, set_num, quantity] = fields;
                 if (inventory_id && set_num && quantity) {
                     if (!inventorySetsMap[inventory_id]) {
                         inventorySetsMap[inventory_id] = [];
@@ -4519,7 +4858,8 @@ async function loadInventoriesFromCSV() {
         
         minifigLines.forEach(line => {
             if (line.trim()) {
-                const [inventory_id, fig_num, quantity] = line.split(',').map(field => field.replace(/"/g, ''));
+                const fields = parseCsvLine(line);
+                const [inventory_id, fig_num, quantity] = fields;
                 if (inventory_id && fig_num && quantity) {
                     if (!inventoryMinifigsMap[inventory_id]) {
                         inventoryMinifigsMap[inventory_id] = [];
@@ -4540,6 +4880,21 @@ async function loadInventoriesFromCSV() {
         };
         
         console.log(`Loaded inventory data from CSV: ${Object.keys(inventoryPartsMap).length} inventories with parts, ${Object.keys(inventorySetsMap).length} with sets, ${Object.keys(inventoryMinifigsMap).length} with minifigs`);
+        
+        // Log image loading statistics
+        const partsWithImages = Object.values(PART_MAP).filter(p => p.part_img_url && p.part_img_url.startsWith('http'));
+        const partsWithColorImages = Object.values(PART_MAP).filter(p => p.colorImages && Object.keys(p.colorImages).length > 0);
+        
+        console.log(`Image loading results: ${partsWithImages.length} parts with images, ${partsWithColorImages.length} parts with color-specific images`);
+        
+        // Log specific part 57899 if it exists
+        if (PART_MAP['57899']) {
+            console.log('Part 57899 after inventory loading:', {
+                part_img_url: PART_MAP['57899'].part_img_url,
+                colorImages: PART_MAP['57899'].colorImages,
+                hasImages: !!PART_MAP['57899'].part_img_url
+            });
+        }
         
         // Fetch missing images for collection items
         await fetchMissingImagesForCollection();
