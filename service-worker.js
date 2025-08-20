@@ -1,4 +1,4 @@
-const CACHE_NAME = 'lego-catalog-cache-v4';
+const CACHE_NAME = 'lego-catalog-cache-v5';
 
 // Keep precache minimal to avoid install failures due to missing files
 const PRECACHE_ASSETS = [
@@ -24,7 +24,14 @@ const CSV_ASSETS = [
     './Data/elements.csv',
     './Data/inventories.csv',
     './Data/inventory_minifigs.csv',
-    './Data/inventory_parts.csv',
+    // inventory_parts.csv is now split into multiple files
+    './Data/inventory_parts_split/inventory_parts_part_001.csv',
+    './Data/inventory_parts_split/inventory_parts_part_002.csv',
+    './Data/inventory_parts_split/inventory_parts_part_003.csv',
+    './Data/inventory_parts_split/inventory_parts_part_004.csv',
+    './Data/inventory_parts_split/inventory_parts_part_005.csv',
+    './Data/inventory_parts_split/inventory_parts_part_006.csv',
+    './Data/inventory_parts_split/inventory_parts_part_007.csv',
     './Data/inventory_sets.csv',
     './Data/part_categories.csv',
     './Data/part_relationships.csv',

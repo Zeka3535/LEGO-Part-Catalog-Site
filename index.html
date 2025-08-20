@@ -46,6 +46,7 @@
     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7"></path></svg>
   </button>
   <script type="module">
+
 const REBRICKABLE_API_URL = 'https://rebrickable.com/api/v3/lego';
 const REBRICKABLE_API_KEYS = ['20c78cc607d6059c8d2a61338d851590', '04a7405ad41f1dd484a562f6e0c57312', 'd93f5c0989f63afa9b1c29ef8ad66002', 'b4179c1b8bd3c022ec9fc0e713e96b77', 'd32527bc33b575b8825a0ba04ba4add5'];
 let currentApiKeyIndex = 0;
@@ -192,6 +193,7 @@ let tempFilters = {
 };
 
 function loadState() {
+    
     const e = localStorage.getItem('legoCollection');
     if (e) try {
         const t = JSON.parse(e);
@@ -262,12 +264,15 @@ async function apiFetchPaginated(e) {
     let o = 1;
     for (;;) {
         const l = e.includes("?") ? "&" : "?",
-            a = `${REBRICKABLE_API_URL}${e}${l}page=${o}&page_size=800`,
-            i = await fetch(a, {
-                headers: {
-                    Authorization: `key ${getApiKey()}`
-                }
-            });
+            a = `${REBRICKABLE_API_URL}${e}${l}page=${o}&page_size=800`;
+        
+        console.log(`API call: ${a}`);
+        
+        const i = await fetch(a, {
+            headers: {
+                Authorization: `key ${getApiKey()}`
+            }
+        });
         if (!i.ok) {
             const e = await i.json().catch(() => ({
                 detail: "Не удалось получить детали ошибки."
@@ -275,6 +280,19 @@ async function apiFetchPaginated(e) {
             throw new Error(`Ошибка API Rebrickable: ${i.status} - ${e.detail}`)
         }
         const n = await i.json();
+        console.log(`API response page ${o}:`, {
+            status: i.status,
+            hasResults: !!n.results,
+            resultsCount: n.results?.length || 0,
+            hasNext: !!n.next,
+            sampleResult: n.results?.[0] ? {
+                part_num: n.results[0].part_num,
+                name: n.results[0].name,
+                has_part_img_url: !!n.results[0].part_img_url,
+                part_img_url: n.results[0].part_img_url
+            } : null
+        });
+        
         if (n.results?.length > 0) {
             t = t.concat(n.results)
         }
@@ -286,6 +304,9 @@ async function apiFetchPaginated(e) {
 
 function procPart(e) {
     if (!e || !e.part_num) return console.warn("Пропуск некорректных данных о детали из API:", e), null;
+    
+
+    
     const t = {
         id: e.part_num,
         name: e.name,
@@ -497,7 +518,7 @@ async function searchRebrickableParts(e) {
             e.bestScore > 0 && (i[e.groupId] = e.partList)
         }), S.searchGroups = i;
         
-        console.log(`Found ${o.length} parts in CSV data for search: "${e}"`);
+
     } catch (t) {
         console.error("CSV search failed:", t), S.err = t.message, S.searchGroups = {}
     } finally {
@@ -557,7 +578,7 @@ async function fetchSets() {
             S.setRes = results;
         }
         
-        console.log(`Loaded ${results.length} sets from CSV data`);
+
     } catch (e) {
         console.error("Ошибка загрузки наборов из CSV:", e), S.err = e.message
     } finally {
@@ -592,7 +613,7 @@ async function fetchMinifigs() {
             results.sort((a, b) => (a.num_parts || 0) - (a.num_parts || 0));
         }
         
-        console.log(`Loaded ${results.length} minifigs from CSV data`);
+
     } catch (e) {
         console.error("Ошибка загрузки минифигурок из CSV:", e), S.err = e.message
     } finally {
@@ -729,11 +750,8 @@ async function ensureBasicPartImagesForCollection() {
     });
     
     if (partsNeedingImages.length === 0) {
-        console.log('All collection parts already have images from inventory_parts.csv');
         return;
     }
-    
-    console.log(`Ensuring basic images for ${partsNeedingImages.length} parts in collection...`);
     
     // Process all parts immediately without API calls
     partsNeedingImages.forEach(partId => {
@@ -742,7 +760,7 @@ async function ensureBasicPartImagesForCollection() {
             // Generate fallback image URL only if no image exists
             part.part_img_url = `https://cdn.rebrickable.com/media/parts/${partId}.jpg`;
             part.rebrickable_img_url = part.part_img_url;
-            console.log(`Generated fallback image for part ${partId}: ${part.part_img_url}`);
+
         }
     });
     
@@ -754,7 +772,6 @@ async function ensureBasicPartImagesForCollection() {
 async function fetchColorDetailsForCollectionParts() {
     // Skip this function if user prefers faster loading over color-specific images
     if (localStorage.getItem('disableColorSpecificImages') === 'true') {
-        console.log('Skipping color-specific images fetch (disabled by user)');
         return;
     }
     
@@ -765,7 +782,7 @@ async function fetchColorDetailsForCollectionParts() {
     
     if (partsNeedingColorImages.length === 0) return;
     
-    console.log(`Fetching color-specific images for ${partsNeedingColorImages.length} parts from collection...`);
+
     
     // Process all parts in small batches to avoid rate limiting
     for (let i = 0; i < partsNeedingColorImages.length; i += 3) {
@@ -795,46 +812,7 @@ async function loadImagesForVisibleParts() {
     return;
 }
 
-// Function to debug part images
-function debugPartImages() {
-    if (S.view !== 'collection' || S.subView !== 'parts') return;
-    
-    console.log('=== DIAGNOSTIC: Part Images Status ===');
-    
-    // Check CSV data
-    console.log('CSV Data Status:');
-    console.log('- Total parts in PART_MAP:', Object.keys(PART_MAP).length);
-    console.log('- Parts with images from inventory_parts.csv:', Object.values(PART_MAP).filter(p => p.part_img_url && p.part_img_url !== `https://cdn.rebrickable.com/media/parts/${p.id}.jpg`).length);
-    console.log('- Parts with fallback images:', Object.values(PART_MAP).filter(p => p.part_img_url === `https://cdn.rebrickable.com/media/parts/${p.id}.jpg`).length);
-    console.log('- Parts with color-specific images:', Object.values(PART_MAP).filter(p => p.colorImages && Object.keys(p.colorImages).length > 0).length);
-    
-    // Check collection parts
-    const collectionParts = Object.keys(S.coll);
-    console.log('Collection Status:');
-    console.log('- Total parts in collection:', collectionParts.length);
-    
-    // Sample some parts for detailed analysis
-    const sampleParts = collectionParts.slice(0, 10);
-    sampleParts.forEach(partId => {
-        const part = PART_MAP[partId];
-        if (part) {
-            console.log(`Part ${partId}:`, {
-                name: part.name,
-                csv_img_url: part.part_img_url,
-                is_fallback: part.part_img_url === `https://cdn.rebrickable.com/media/parts/${partId}.jpg`,
-                has_color_images: !!part.colorImages
-            });
-        }
-    });
-    
-    // Check specific part 57899 if it exists
-    if (PART_MAP['57899']) {
-        console.log('=== DETAILED: Part 57899 ===');
-        console.log(PART_MAP['57899']);
-    }
-    
-    console.log('=== END DIAGNOSTIC ===');
-}
+
 
 // Function to force refresh part images in collection view
 async function forceRefreshPartImages() {
@@ -850,8 +828,6 @@ async function forceRefreshPartImages() {
     refreshIcon.innerHTML = '<div class="loader !w-5 !h-5 !border-2"></div>';
     
     try {
-        console.log('Forcing refresh of part images...');
-        
         // First ensure all parts have basic images
         await ensureBasicPartImagesForCollection();
         
@@ -861,8 +837,6 @@ async function forceRefreshPartImages() {
         // Update UI once at the end
         S.gridStale = true;
         updateUI();
-        
-        console.log('Part images refresh completed successfully');
     } catch (error) {
         console.error('Error refreshing part images:', error);
     } finally {
@@ -875,11 +849,12 @@ async function forceRefreshPartImages() {
 async function fetchMissingCollectionPartDetails() {
     const e = Object.keys(S.coll).filter(e => !PART_MAP[e] || !PART_MAP[e].name);
     if (e.length === 0) return;
-    console.log(`Fetching details for ${e.length} parts from collection...`);
+    
     for (let t = 0; t < e.length; t += 100) {
         const o = e.slice(t, t + 100);
         try {
             const parts = await apiFetchPaginated(`/parts/?part_nums=${o.join(",")}`);
+            
             if (parts && Array.isArray(parts)) {
                 parts.map(procPart).filter(Boolean);
             }
@@ -894,7 +869,6 @@ async function fetchMissingCollectionPartDetails() {
 async function fetchMissingCollectionSetDetails() {
     const e = Object.keys(S.setColl).filter(e => !SET_MAP[e] || !SET_MAP[e].name);
     if (e.length === 0) return;
-    console.log(`Fetching details for ${e.length} sets from collection...`);
     for (let t = 0; t < e.length; t += 50) {
         const o = e.slice(t, t + 50);
         try {
@@ -1093,7 +1067,7 @@ async function fetchMissingMinifigPartImages(minifigParts) {
         return;
     }
     
-    console.log(`Fetching ${partsWithoutImages.length} missing part images for minifig parts...`);
+
     
     for (const partInfo of partsWithoutImages.slice(0, 5)) { // Limit to 5 to avoid rate limiting
         if (!partInfo || !partInfo.part || !partInfo.part.part_num) {
@@ -1121,7 +1095,7 @@ async function fetchMissingMinifigPartImages(minifigParts) {
                 const data = await response.json();
                 if (data.results && data.results[0] && data.results[0].part_img_url) {
                     partInfo.part.part_img_url = data.results[0].part_img_url;
-                    console.log(`Updated image URL for part ${partInfo.part.part_num}`);
+
                 }
             }
             
@@ -1513,9 +1487,6 @@ function renderHeader() {
                         <button id="refresh-images-button" class="p-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed" aria-label="Обновить изображения" title="Принудительно обновить изображения деталей">
                             <span id="refresh-images-icon">${I_Refresh("w-5 h-5")}</span>
                         </button>
-                        <button id="debug-images-button" class="p-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors flex-shrink-0" aria-label="Диагностика изображений" title="Проверить состояние изображений деталей">
-                            ${I_Search("w-5 h-5")}
-                        </button>
                     ` : ''}
                 </div>
                 ${loadingIndicator}
@@ -1587,7 +1558,7 @@ function renderPartCard(e, t, o, l, a = 0) {
         s = l ? `animation-delay: ${Math.min(40*a,1500)}ms;` : "";
     let c = "";
     o > 0 && (c = `<div class="absolute top-3 ${i?"left-3":"right-3"} bg-blue-600 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center z-10 shadow-md">${o}</div>`);
-    // FIXED: Now properly uses part_img_url from inventory_parts.csv as primary image source
+            // FIXED: Now properly uses part_img_url from inventory_parts.csv as primary image source
     let d = e.part_img_url || e.rebrickable_img_url;
     
     // Only try to get color-specific images if the feature is enabled and available
@@ -1609,15 +1580,7 @@ function renderPartCard(e, t, o, l, a = 0) {
         }
     }
     
-    // Log which image URL is being used for debugging
-    if (e.id === '57899') {
-        console.log(`Part ${e.id} image selection:`, {
-            original: e.part_img_url,
-            rebrickable: e.rebrickable_img_url,
-            colorSpecific: PART_MAP[e.id]?.colorImages?.[t?.id],
-            final: d
-        });
-    }
+
     const tHtml = t ? `
         <div class="flex items-center pt-1 pointer-events-none">
             <span class="w-4 h-4 rounded-full border border-gray-500 ${t.isTransparent?"checkerboard":""}" style="background-color: ${t.hex};"></span>
@@ -3185,7 +3148,7 @@ async function importCollectionAndCacheFromZip(file) {
             await processCsvData(csvContent);
         }
         // No image cache import - we only import collections and favorites
-        console.log('Image cache import skipped - not needed with CSV-based system');
+
         S.settingsModal.status = "Импорт завершен. Перезагрузка данных из CSV...", S.settingsModal.statusType = "success", renderSettingsModal();
         
         // Reload all data from CSV after import to ensure consistency
@@ -3253,7 +3216,7 @@ function handleUpdateSetCollection(e, t) {
     const o = (S.setColl[e]?.qty || 0) > 0;
     t > 0 ? (S.setColl[e] = {
         qty: t
-    }, o || (console.log(`Proactively fetching data for new set in collection: ${e}`), fetchAllSetInventory(e).catch(t => console.error(`Failed to proactively fetch inventory for ${e}`, t)), fetchSetMinifigs(e).catch(t => console.error(`Failed to proactively fetch minifigs for ${e}`, t)))) : delete S.setColl[e], saveState(), forceSaveState(), S.gridStale = !0, "collection" === S.view ? updateUI() : (renderSidebar(), mainEl.querySelector(`.set-card[data-set-num="${e}"]`)?.prepend(function() {
+        }, o || (fetchAllSetInventory(e).catch(t => console.error(`Failed to proactively fetch inventory for ${e}`, t)), fetchSetMinifigs(e).catch(t => console.error(`Failed to proactively fetch minifigs for ${e}`, t)))) : delete S.setColl[e], saveState(), forceSaveState(), S.gridStale = !0, "collection" === S.view ? updateUI() : (renderSidebar(), mainEl.querySelector(`.set-card[data-set-num="${e}"]`)?.prepend(function() {
         if (t > 0) {
             let o = document.createElement("div");
             return o.className = "absolute top-3 right-3 bg-blue-600 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center z-10 shadow-md", o.textContent = String(t), o
@@ -3802,9 +3765,7 @@ document.addEventListener("click", async e => {
     if (t.closest("#refresh-images-button")) {
         return void forceRefreshPartImages();
     }
-    if (t.closest("#debug-images-button")) {
-        return void debugPartImages();
-    }
+
     if (t.closest("#settings-button")) return S.settingsOpen = !0, void renderSettingsModal();
     const h = t.closest('[data-action="remove-filter"]');
     if (h) {
@@ -4197,7 +4158,6 @@ document.addEventListener("click", async e => {
     e && toTopBtn.classList.contains("opacity-0") ? toTopBtn.classList.remove("opacity-0", "pointer-events-none", "translate-y-4") : !e && !toTopBtn.classList.contains("opacity-0") && toTopBtn.classList.add("opacity-0", "pointer-events-none", "translate-y-4")
 });
 async function initializeApp() {
-    console.log("Инициализация каталога LEGO...");
     loadState();
     
     S.sidebarLoading = true;
@@ -4205,14 +4165,10 @@ async function initializeApp() {
 
     try {
         // Always load data from CSV files first (fast, offline)
-        console.log("Loading data from CSV files...");
         await loadDataFromCSV();
         
         // Check for new data from API in background (without overloading)
-        console.log("Checking for new data from API in background...");
         checkForNewDataInBackground();
-        
-        console.log("All data loaded successfully from CSV!");
         
     } catch (e) {
         console.error("Data loading failed:", e);
@@ -4396,7 +4352,6 @@ document.addEventListener("DOMContentLoaded", () => {
 // Function to load data from CSV files
 async function loadDataFromCSV() {
     try {
-        console.log('Loading data from CSV files...');
         
         // Update loading status
         S.settingsModal.status = "Загрузка данных из CSV...", S.settingsModal.statusType = "info";
@@ -4443,8 +4398,6 @@ async function loadDataFromCSV() {
         await loadInventoriesFromCSV();
         
         const stats = getLoadingStats();
-        console.log('All CSV data loaded successfully');
-        console.log(`Loaded from CSV: ${stats.parts} parts, ${stats.sets} sets, ${stats.minifigs} minifigs, ${stats.colors} colors, ${stats.categories} categories, ${stats.themes} themes`);
         
         // Update loading status
         S.settingsModal.status = "Данные из CSV загружены успешно!", S.settingsModal.statusType = "success";
@@ -4462,10 +4415,8 @@ async function loadDataFromCSV() {
         S.err = `Ошибка загрузки CSV данных: ${error.message}`;
         
         // Fallback to API loading if CSV fails
-        console.log('Falling back to API loading...');
         try {
             await Promise.all([fetchAllColors(), fetchCategories(), fetchThemes()]);
-            console.log('Fallback API loading completed');
         } catch (apiError) {
             console.error('Fallback API loading also failed:', apiError);
             S.err = `${S.err}\nТакже не удалось загрузить данные из API: ${apiError.message}`;
@@ -4497,7 +4448,7 @@ async function loadColorsFromCSV() {
             }
         });
         
-        console.log(`Loaded ${Object.keys(COLOR_MAP).length} colors from CSV`);
+
     } catch (error) {
         console.error('Failed to load colors from CSV:', error);
         throw error;
@@ -4528,7 +4479,7 @@ async function loadCategoriesFromCSV() {
         // Build category tree
         S.catTree = buildCategoryTree(flatCategories);
         
-        console.log(`Loaded ${flatCategories.length} categories from CSV`);
+
     } catch (error) {
         console.error('Failed to load categories from CSV:', error);
         throw error;
@@ -4573,7 +4524,7 @@ async function loadThemesFromCSV() {
         
         S.themeTree = rootThemes;
         
-        console.log(`Loaded ${Object.keys(THEME_MAP).length} themes from CSV`);
+
     } catch (error) {
         console.error('Failed to load themes from CSV:', error);
         throw error;
@@ -4607,7 +4558,7 @@ async function loadPartsFromCSV() {
             }
         });
         
-        console.log(`Loaded ${Object.keys(PART_MAP).length} parts from CSV (without images)`);
+
     } catch (error) {
         console.error('Failed to load parts from CSV:', error);
         throw error;
@@ -4647,7 +4598,7 @@ async function loadSetsFromCSV() {
             }
         });
         
-        console.log(`Loaded ${Object.keys(SET_MAP).length} sets from CSV with image URLs`);
+
     } catch (error) {
         console.error('Failed to load sets from CSV:', error);
         throw error;
@@ -4686,7 +4637,7 @@ async function loadMinifigsFromCSV() {
             }
         });
         
-        console.log(`Loaded ${Object.keys(MINIFIG_MAP).length} minifigs from CSV with image URLs`);
+
         
         // Fetch missing image URLs from API for minifigs without images
         await fetchMissingMinifigImages();
@@ -4701,15 +4652,11 @@ async function fetchMissingMinifigImages() {
     const minifigsWithoutImages = Object.values(MINIFIG_MAP).filter(m => !m.minifig_img_url);
     
     if (minifigsWithoutImages.length === 0) {
-        console.log('All minifigs have image URLs');
         return;
     }
     
-    console.log(`Fetching ${minifigsWithoutImages.length} missing minifig image URLs from API...`);
-    
     for (const minifig of minifigsWithoutImages.slice(0, 10)) { // Limit to 10 to avoid rate limiting
         if (!minifig || !minifig.set_num) {
-            console.warn('Invalid minifig data, skipping...');
             continue;
         }
         
@@ -4719,13 +4666,12 @@ async function fetchMissingMinifigImages() {
                 const data = await response.json();
                 if (data.results && data.results[0] && data.results[0].set_img_url) {
                     minifig.minifig_img_url = data.results[0].set_img_url;
-                    console.log(`Updated image URL for minifig ${minifig.set_num}`);
                 }
             }
             // Add delay to avoid rate limiting
             await new Promise(resolve => setTimeout(resolve, 100));
         } catch (error) {
-            console.warn(`Failed to fetch image URL for minifig ${minifig.set_num}:`, error);
+            // Ignore individual minifig fetch errors
         }
     }
 }
@@ -4753,7 +4699,7 @@ async function loadElementsFromCSV() {
             }
         });
         
-        console.log(`Loaded elements from CSV`);
+
     } catch (error) {
         console.error('Failed to load elements from CSV:', error);
         // Don't throw error for elements as it's not critical
@@ -4763,19 +4709,65 @@ async function loadElementsFromCSV() {
 // Function to load inventories from CSV
 async function loadInventoriesFromCSV() {
     try {
-        // Load inventory_parts
-        const response = await fetch('./Data/inventory_parts.csv');
-        const csvText = await response.text();
-        const lines = csvText.split('\n').slice(1); // Skip header
+        // Load inventory_parts from multiple split files
+        const inventoryPartsLines = [];
+        
+        // Try to load all 7 parts (based on the split results)
+        const maxParts = 7;
+        let loadedParts = 0;
+        
+        for (let partNum = 1; partNum <= maxParts; partNum++) {
+            const partFileName = `./Data/inventory_parts_split/inventory_parts_part_${partNum.toString().padStart(3, '0')}.csv`;
+            try {
+                const response = await fetch(partFileName);
+                if (!response.ok) {
+                    break;
+                }
+                const csvText = await response.text();
+                
+                const lines = csvText.split('\n');
+                
+                // Skip header for all parts except the first one
+                const linesToAdd = partNum === 1 ? lines.slice(1) : lines.slice(1);
+                
+                // Use for loop to avoid stack overflow with large arrays
+                for (let i = 0; i < linesToAdd.length; i++) {
+                    inventoryPartsLines.push(linesToAdd[i]);
+                }
+                loadedParts++;
+                
+                // Update loading status
+                if (S.settingsOpen) {
+                    S.settingsModal.status = `Загрузка инвентарей (часть ${partNum}/${maxParts})...`;
+                    renderSettingsModal();
+                }
+            } catch (error) {
+                console.error(`Failed to load part ${partNum}:`, error);
+                break;
+            }
+        }
+        
+
+        
+        const lines = inventoryPartsLines;
         
         // Create inventory maps for quick lookup
         const inventoryPartsMap = {};
         const inventorySetsMap = {};
         const inventoryMinifigsMap = {};
         
-        lines.forEach(line => {
+        // Process inventory parts lines and update PART_MAP with image information
+        let partsWithImagesCount = 0;
+        let partsWithColorImagesCount = 0;
+        
+        let processedLines = 0;
+        let skippedLines = 0;
+        
+        lines.forEach((line, lineIndex) => {
             if (line.trim()) {
                 const fields = parseCsvLine(line);
+                processedLines++;
+                
                 const [inventory_id, part_num, color_id, quantity, is_spare, img_url] = fields;
                 if (inventory_id && part_num && color_id && quantity && is_spare !== 't') {
                     if (!inventoryPartsMap[inventory_id]) {
@@ -4788,8 +4780,9 @@ async function loadInventoriesFromCSV() {
                         img_url: img_url || null
                     });
                     
-                    // Store image URL for this part-color combination
-                    if (img_url && img_url.trim() && img_url.startsWith('http')) {
+                    // Store image URL for this part-color combination (if present)
+                    if (fields.length > 5 && img_url && img_url.trim() && img_url.startsWith('http')) {
+                        // Ensure PART_MAP entry exists
                         if (!PART_MAP[part_num]) {
                             PART_MAP[part_num] = { 
                                 id: part_num, 
@@ -4804,12 +4797,18 @@ async function loadInventoriesFromCSV() {
                         
                         // Store the image URL for this specific color
                         PART_MAP[part_num].colorImages[color_id] = img_url;
+                        partsWithColorImagesCount++;
                         
                         // Also set as default image if none exists
                         if (!PART_MAP[part_num].part_img_url) {
                             PART_MAP[part_num].part_img_url = img_url;
                             PART_MAP[part_num].rebrickable_img_url = img_url;
+                            partsWithImagesCount++;
+                            
+
                         }
+                    } else {
+
                     }
                     
                     // Ensure parts and colors exist
@@ -4826,9 +4825,14 @@ async function loadInventoriesFromCSV() {
                             hex: '#000000' 
                         };
                     }
+                } else {
+                    skippedLines++;
+
                 }
             }
         });
+        
+
         
         // Load inventory_sets
         const setResponse = await fetch('./Data/inventory_sets.csv');
@@ -4879,25 +4883,10 @@ async function loadInventoriesFromCSV() {
             minifigs: inventoryMinifigsMap
         };
         
-        console.log(`Loaded inventory data from CSV: ${Object.keys(inventoryPartsMap).length} inventories with parts, ${Object.keys(inventorySetsMap).length} with sets, ${Object.keys(inventoryMinifigsMap).length} with minifigs`);
-        
-        // Log image loading statistics
-        const partsWithImages = Object.values(PART_MAP).filter(p => p.part_img_url && p.part_img_url.startsWith('http'));
-        const partsWithColorImages = Object.values(PART_MAP).filter(p => p.colorImages && Object.keys(p.colorImages).length > 0);
-        
-        console.log(`Image loading results: ${partsWithImages.length} parts with images, ${partsWithColorImages.length} parts with color-specific images`);
-        
-        // Log specific part 57899 if it exists
-        if (PART_MAP['57899']) {
-            console.log('Part 57899 after inventory loading:', {
-                part_img_url: PART_MAP['57899'].part_img_url,
-                colorImages: PART_MAP['57899'].colorImages,
-                hasImages: !!PART_MAP['57899'].part_img_url
-            });
-        }
+
         
         // Fetch missing images for collection items
-        await fetchMissingImagesForCollection();
+        await fetchMissingImagesFromCSV();
     } catch (error) {
         console.error('Failed to load inventory data from CSV:', error);
         // Don't throw error for inventory as it's not critical
@@ -5007,17 +4996,12 @@ function calculateSearchScore(item, searchTerm) {
 // Function to check for new data from API in background (without overloading)
 async function checkForNewDataInBackground() {
     try {
-        console.log('Checking for new data from API in background...');
-        
         // Only check for new data, don't download everything
         const newDataAvailable = await checkForNewDataAvailability();
         
         if (newDataAvailable) {
-            console.log('New data available from API, will download in background...');
             // Download new data in background with delays to avoid overloading
             downloadNewDataInBackground();
-        } else {
-            console.log('No new data available from API');
         }
         
     } catch (error) {
@@ -5031,7 +5015,6 @@ async function checkForNewDataAvailability() {
     try {
         // Since we now generate all image URLs from CSV data, there's no need to check for new images
         // This function is kept for future use when new data might be available
-        console.log('All image URLs are generated from CSV data - no new data to check');
         return false;
         
     } catch (error) {
@@ -5043,11 +5026,8 @@ async function checkForNewDataAvailability() {
 // Function to download new data in background with delays
 async function downloadNewDataInBackground() {
     try {
-        console.log('Downloading new data in background...');
-        
         // Since we now generate all image URLs from CSV data, there's no need to download images
         // This function is kept for future use when new data might be available
-        console.log('All image URLs are generated from CSV data - no background download needed');
         
         // Save state after background download
         saveState();
@@ -5075,7 +5055,6 @@ function checkMissingData() {
     
     // Since we now generate image URLs from CSV data, we don't need to check for missing images
     // Only check for data that might be truly missing (e.g., new releases not in CSV)
-    console.log('All image URLs are generated from CSV data - no missing data to check');
     
     return missing;
 }
@@ -5083,15 +5062,11 @@ function checkMissingData() {
 // Function to load missing data from API
 async function loadMissingDataFromAPI() {
     try {
-        console.log('Checking for missing data...');
         const missing = checkMissingData();
         
         if (missing.parts.length === 0 && missing.sets.length === 0 && missing.minifigs.length === 0) {
-            console.log('No missing data found, all data loaded from CSV');
             return;
         }
-        
-        console.log('Loading missing data from API...');
         
         // Update loading status
         S.settingsModal.status = "Загрузка недостающих данных из API...", S.settingsModal.statusType = "info";
@@ -5099,12 +5074,8 @@ async function loadMissingDataFromAPI() {
         
         // Since we now generate all image URLs from CSV, this function is mainly for future use
         // when new data might be available that's not in our CSV files
-        console.log('All current data is available from CSV - API loading not needed');
         
         const stats = getLoadingStats();
-        console.log(`Current stats:`, stats);
-        console.log(`Total: ${stats.parts} parts, ${stats.sets} sets, ${stats.minifigs} minifigs`);
-        console.log(`All have images generated from CSV data`);
         
         // Update loading status
         S.settingsModal.status = "Все данные доступны из CSV!", S.settingsModal.statusType = "success";
@@ -5121,22 +5092,17 @@ async function loadMissingDataFromAPI() {
 // Function to force refresh minifig data to avoid #undefined
 async function refreshMinifigData() {
     try {
-        console.log('Refreshing minifig data...');
         const minifigsToRefresh = Object.keys(S.minifigColl).filter(figNum => !MINIFIG_MAP[figNum]?.name);
         
         if (minifigsToRefresh.length === 0) {
-            console.log('No minifigs need refreshing');
             return;
         }
         
-        console.log(`Refreshing ${minifigsToRefresh.length} minifigs...`);
         await fetchMissingCollectionMinifigDetails();
         
         // Update UI after refresh
         S.gridStale = true;
         updateUI();
-        
-        console.log('Minifig data refreshed successfully');
     } catch (error) {
         console.error('Failed to refresh minifig data:', error);
     }
@@ -5156,11 +5122,8 @@ async function refreshImageCache() {
         );
         
         if (imageRequests.length === 0) {
-            console.log('No cached images found to refresh');
             return;
         }
-        
-        console.log(`Refreshing ${imageRequests.length} cached images...`);
         
         // Refresh each image by fetching it again
         for (const request of imageRequests) {
@@ -5173,11 +5136,9 @@ async function refreshImageCache() {
                     await cache.put(request, response);
                 }
             } catch (error) {
-                console.warn(`Failed to refresh ${request.url}:`, error);
+                // Ignore individual image refresh errors
             }
         }
-        
-        console.log('Image cache refresh completed');
     } catch (error) {
         console.error('Failed to refresh image cache:', error);
     }
@@ -5189,7 +5150,6 @@ setInterval(refreshImageCache, 30 * 60 * 1000);
 // Function to force save all state data including newly fetched details
 function forceSaveState() {
     try {
-        console.log('Force saving all state data...');
         saveState();
         
         // Also save any additional data that might have been fetched
@@ -5203,7 +5163,6 @@ function forceSaveState() {
         };
         
         localStorage.setItem('legoDataCacheStats', JSON.stringify(cache));
-        console.log('State saved successfully. Cache stats:', cache);
     } catch (e) {
         console.error('Failed to force save state:', e);
     }
@@ -5231,7 +5190,7 @@ function getColorImageUrl(partNum, colorId, fallbackUrl = null) {
 // Function to handle color image load errors and fetch from API
 async function handleColorImageLoadError(imgElement, partNum, colorId, originalUrl) {
     try {
-        console.log(`Color image failed to load for part ${partNum} color ${colorId}, fetching from API...`);
+
         
         // Fetch color details from API to get fresh image URL
         const colorDetails = await fetchPartColorDetailsFromAPI(partNum, colorId);
@@ -5245,7 +5204,7 @@ async function handleColorImageLoadError(imgElement, partNum, colorId, originalU
                 forceSaveState();
             }
             
-            console.log(`Successfully loaded color image for part ${partNum} color ${colorId} from API`);
+
             return;
         }
         
@@ -5277,15 +5236,12 @@ async function fetchPartColorDetailsFromAPI(partNum, colorId) {
 // Function to check for missing images in collection
 async function fetchMissingImagesForCollection() {
     try {
-        console.log('Checking for missing images in collection...');
-        
         // Check for missing minifig images
         const minifigsWithoutImages = Object.values(MINIFIG_MAP).filter(m => 
             m && !m.minifig_img_url && !m.set_img_url
         );
         
         if (minifigsWithoutImages.length > 0) {
-            console.log(`Found ${minifigsWithoutImages.length} minifigs without images, fetching...`);
             await fetchMissingMinifigImages();
         }
         
@@ -5295,7 +5251,6 @@ async function fetchMissingImagesForCollection() {
         );
         
         if (partsWithoutImages.length > 0) {
-            console.log(`Found ${partsWithoutImages.length} parts without images, fetching...`);
             // This will be handled by the existing functions
         }
         
@@ -5305,7 +5260,6 @@ async function fetchMissingImagesForCollection() {
         );
         
         if (setsWithoutImages.length > 0) {
-            console.log(`Found ${setsWithoutImages.length} sets without images, fetching...`);
             // This will be handled by the existing functions
         }
         
@@ -5317,13 +5271,10 @@ async function fetchMissingImagesForCollection() {
 // Function to check images for currently viewed items
 async function fetchImagesForViewedItems() {
     try {
-        console.log('Checking for missing images in currently viewed items...');
-        
         // Check minifig modal
         if (S.selFigNum && MINIFIG_MAP[S.selFigNum]) {
             const minifig = MINIFIG_MAP[S.selFigNum];
             if (!minifig.minifig_img_url && !minifig.set_img_url) {
-                console.log(`Fetching missing image for minifig ${S.selFigNum}`);
                 await fetchMinifigDetails(S.selFigNum);
             }
         }
@@ -5332,7 +5283,6 @@ async function fetchImagesForViewedItems() {
         if (S.selPartId && PART_MAP[S.selPartId]) {
             const part = PART_MAP[S.selPartId];
             if (!part.part_img_url && !part.rebrickable_img_url) {
-                console.log(`Fetching missing image for part ${S.selPartId}`);
                 // This will be handled by the part modal itself
             }
         }
@@ -5341,7 +5291,6 @@ async function fetchImagesForViewedItems() {
         if (S.selSetNum && SET_MAP[S.selSetNum]) {
             const set = SET_MAP[S.selSetNum];
             if (!set.set_img_url) {
-                console.log(`Fetching missing image for set ${S.selSetNum}`);
                 // This will be handled by the set modal itself
             }
         }
@@ -5373,7 +5322,6 @@ async function fetchMinifigDetailsWithRetry(figNum, retries = 3, delay = 1000) {
 async function fetchMissingCollectionMinifigDetails() {
     const allFigNums = Object.keys(S.minifigColl).filter(e => !MINIFIG_MAP[e] || !MINIFIG_MAP[e].name);
     if (allFigNums.length === 0) return;
-    console.log(`Fetching details for ${allFigNums.length} minifigs from collection...`);
     const batchSize = 5;
     for (let i = 0; i < allFigNums.length; i += batchSize) {
         const batch = allFigNums.slice(i, i + batchSize);
