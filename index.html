@@ -19,11 +19,132 @@
   <meta property="og:type" content="website">
 
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-  <style>
+
+      <style>
     body{font-family:sans-serif}.no-scrollbar::-webkit-scrollbar{display:none}.no-scrollbar{-ms-overflow-style:none;scrollbar-width:none}#search-input::-webkit-search-cancel-button{-webkit-appearance:none;appearance:none;display:none}.checkerboard{background-image:linear-gradient(45deg,#374151 25%,transparent 25%),linear-gradient(-45deg,#374151 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#374151 75%),linear-gradient(-45deg,transparent 75%,#374151 75%);background-size:8px 8px;background-position:0 0,0 4px,4px -4px,-4px 0}.modal-hidden{display:none!important}.viewer-hidden{display:none!important}.loader{border:4px solid #4a5568;border-top:4px solid #4299e1;border-radius:50%;width:48px;height:48px;animation:spin 1s linear infinite}@keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}@keyframes fadeIn{from{opacity:0}to{opacity:1}}@keyframes fadeOut{from{opacity:1}to{opacity:0}}@keyframes scaleIn{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}@keyframes scaleOut{from{opacity:1;transform:scale(1)}to{opacity:0;transform:scale(.95)}}@keyframes fadeInUp{from{opacity:0;transform:translateY(1rem)}to{opacity:1;transform:translateY(0)}}#modal-container,#filter-modal-container,#set-modal-container,#settings-modal-container,#minifig-modal-container,#image-viewer-container{opacity:0;transition:opacity .2s ease-out}#modal-container.visible,#filter-modal-container.visible,#set-modal-container.visible,#settings-modal-container.visible,#minifig-modal-container.visible,#image-viewer-container.visible{opacity:1}.modal-content-enter{animation:scaleIn .2s ease-out forwards}.modal-content-leave{animation:scaleOut .2s ease-out forwards}.part-card.animate-in,.set-card.animate-in,.minifig-card.animate-in{opacity:0;animation:fadeInUp .4s ease-out forwards}#color-selector-wrapper{transition:max-height .35s ease-in-out;overflow:hidden}#image-viewer-container img{transform:scale(.95);opacity:0;transition:transform .2s ease-out,opacity .2s ease-out}#image-viewer-container.visible img{transform:scale(1);opacity:1}
+    
+    /* Стили для кастомного выпадающего списка вариаций */
+    #variation-select-button {
+        max-width: 100% !important;
+        width: 100% !important;
+        box-sizing: border-box;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        background-color: #374151 !important;
+        border: 1px solid #4B5563 !important;
+        border-radius: 6px !important;
+        color: white !important;
+        font-size: 14px !important;
+        line-height: 1.5 !important;
+        transition: all 0.2s ease !important;
+        min-width: 0 !important;
+        flex-shrink: 1 !important;
+        cursor: pointer !important;
+        user-select: none !important;
+    }
+    
+    #variation-select-button:hover {
+        border-color: #6B7280 !important;
+        background-color: #4B5563 !important;
+    }
+    
+    #variation-select-button:focus {
+        outline: none !important;
+        border-color: #3B82F6 !important;
+        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5) !important;
+    }
+    
+    #variation-select-button.open {
+        border-color: #3B82F6 !important;
+        background-color: #4B5563 !important;
+    }
+    
+    #variation-select-button.open svg {
+        transform: rotate(180deg) !important;
+    }
+    
+    #variation-dropdown {
+        position: absolute !important;
+        z-index: 99999 !important;
+        background-color: #374151 !important;
+        border: 1px solid #4B5563 !important;
+        border-radius: 6px !important;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+        max-height: 240px !important;
+        overflow-y: auto !important;
+        transition: all 0.2s ease !important;
+        box-sizing: border-box !important;
+        min-width: 100% !important;
+        max-width: 100% !important;
+        top: 100% !important;
+        left: 0 !important;
+        right: 0 !important;
+        margin-top: 4px !important;
+    }
+    
+    .variation-option {
+        max-width: 100% !important;
+        width: 100% !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+        box-sizing: border-box;
+        padding: 8px 12px !important;
+        background-color: #374151 !important;
+        color: white !important;
+        cursor: pointer !important;
+        transition: background-color 0.15s ease !important;
+        border-bottom: 1px solid #4B5563 !important;
+    }
+    
+    .variation-option:last-child {
+        border-bottom: none !important;
+    }
+    
+    .variation-option:hover {
+        background-color: #4B5563 !important;
+    }
+    
+    .variation-option.selected {
+        background-color: #3B82F6 !important;
+    }
+    
+    .variation-option.selected:hover {
+        background-color: #2563EB !important;
+    }
+    
+    /* Стили для контейнера */
+    .variation-select-container {
+        position: relative !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        overflow: visible !important;
+    }
+    
+    /* Стили для неактивных кнопок */
+    button[disabled] {
+        opacity: 0.5 !important;
+        cursor: not-allowed !important;
+        pointer-events: none !important;
+    }
+    
+    button[disabled]:hover {
+        background-color: inherit !important;
+        transform: none !important;
+    }
+    
+    /* Убираем стандартную стрелку браузера */
+    .variation-select-container::after {
+        display: none !important;
+    }
+    
+    /* Для мобильных устройств */
+    @media (max-width: 768px) {
+        #variation-select-button {
+            font-size: 16px; /* Предотвращает зум на iOS */
+        }
+    }
   </style>
-<link rel="stylesheet" href="./index.css">
 </head>
 <body class="bg-gray-900 text-gray-200">
   <aside id="sidebar-container" class="w-80 bg-gray-800 p-4 flex flex-col h-full border-r border-gray-700 fixed inset-y-0 left-0 z-40 transition-transform duration-300 ease-in-out lg:translate-x-0 -translate-x-full"></aside>
@@ -334,8 +455,9 @@ function getGroupId(e) {
 function groupParts(e) {
     const t = {};
     return (e || []).forEach(e => {
-        if (!e || !e.part_num) return void console.warn("Пропуск детали без номера:", e);
-        const o = getGroupId(e.part_num);
+        if (!e || (!e.part_num && !e.id)) return void console.warn("Пропуск детали без номера:", e);
+        const partNum = e.part_num || e.id;
+        const o = getGroupId(partNum);
         t[o] || (t[o] = []), t[o].push(e)
     }), Object.keys(t).forEach(e => {
         t[e].sort(partCmp)
@@ -370,16 +492,16 @@ function buildCategoryTree(e) {
             }
         i || l.push(e)
     });
-    const a = Object.values(o).sort((e, t) => e.name.localeCompare(t.name));
+    const a = Object.values(o).sort((e, t) => e.name.localeCompare(t.name, 'en'));
     return l.length > 0 && a.push({
         name: "Other",
-        children: l.sort((e, t) => e.name.localeCompare(t.name))
+        children: l.sort((e, t) => e.name.localeCompare(t.name, 'en'))
     }), a
 }
 async function fetchCategories() {
     try {
         const e = await apiFetchPaginated("/part_categories/");
-        flatCategories = e.sort((e, t) => e.name.localeCompare(t.name)), S.catTree = buildCategoryTree(flatCategories)
+        flatCategories = e.sort((e, t) => e.name.localeCompare(t.name, 'en')), S.catTree = buildCategoryTree(flatCategories)
         // Force save state after categories are fetched to persist all category data
         forceSaveState();
     } catch (e) {
@@ -411,11 +533,11 @@ async function fetchThemes() {
         });
         const l = (e) => {
             if (Array.isArray(e.children) && e.children.length > 0) {
-                e.children.sort((e, t) => e.name.localeCompare(t.name));
+                e.children.sort((e, t) => e.name.localeCompare(t.name, 'en'));
                 e.children.forEach(l);
             }
         };
-        t.sort((e, t) => e.name.localeCompare(t.name)), t.forEach(l), S.themeTree = t
+        t.sort((e, t) => e.name.localeCompare(t.name, 'en')), t.forEach(l), S.themeTree = t
         // Force save state after themes are fetched to persist all theme data
         forceSaveState();
     } catch (e) {
@@ -425,6 +547,7 @@ async function fetchThemes() {
 async function fetchAllColors() {
     try {
         const e = await apiFetchPaginated("/colors/");
+        const colorsCount = (e || []).length;
         (e || []).forEach(e => {
             const t = String(e.id);
             COLOR_MAP[t] = {
@@ -436,6 +559,12 @@ async function fetchAllColors() {
                 is_trans: e.is_trans
             }
         })
+        
+        // Update API loading statistics
+        if (colorsCount > 0) {
+            updateApiLoadingStats('colors', colorsCount);
+        }
+        
         // Force save state after colors are fetched to persist all color data
         forceSaveState();
     } catch (e) {
@@ -459,31 +588,34 @@ async function loadPartsForCategory(e) {
 
 function getRelevanceScore(e, t) {
     const o = t.toLowerCase(),
-        l = e.name.toLowerCase(),
-        a = e.part_num.toLowerCase();
+        l = e.name ? e.name.toLowerCase() : '',
+        a = e.part_num ? e.part_num.toLowerCase() : e.id ? e.id.toLowerCase() : '';
     return a === o ? 100 : l === o ? 90 : a.startsWith(o) ? 80 : l.startsWith(o) ? 70 : a.includes(o) ? 60 : l.includes(o) ? 50 : 0
 }
 
 function partCmp(e, t) {
-    if (!t || !t.part_num || !t.name) return -1;
-    if (!e || !e.part_num || !e.name) return 1;
+    if (!t || (!t.part_num && !t.id) || !t.name) return -1;
+    if (!e || (!e.part_num && !e.id) || !e.name) return 1;
     const o = e.name.toLowerCase().includes("print") || e.name.toLowerCase().includes("sticker") || e.name.toLowerCase().includes("pattern"),
         l = t.name.toLowerCase().includes("print") || t.name.toLowerCase().includes("sticker") || t.name.toLowerCase().includes("pattern");
     if (o && !l) return 1;
     if (!o && l) return -1;
-    const a = e.part_num.match(/[a-zA-Z]/),
-        i = t.part_num.match(/[a-zA-Z]/);
+    const a = (e.part_num || e.id).match(/[a-zA-Z]/),
+        i = (t.part_num || t.id).match(/[a-zA-Z]/);
     if (a && !i) return 1;
     if (!a && i) return -1;
-    const n = t.num_sets - e.num_sets;
+    const n = (t.num_sets || 0) - (e.num_sets || 0);
     if (0 !== n) return n;
     const r = e.name.length - t.name.length;
-    return 0 !== r ? r : e.part_num.localeCompare(t.part_num)
+    return 0 !== r ? r : (e.part_num || e.id).localeCompare(t.part_num || t.id, 'en')
 }
 async function searchRebrickableParts(e) {
     if (!e || e.trim().length === 0) return S.searchGroups = null, S.loading = !1, S.selCatId = null, S.gridStale = !0, void updateUI();
     if (S.loading = !0, S.err = null, S.selCatId = null, S.catGroups = null, S.toDisplay = S.increment, S.gridStale = !0, updateUI(), S.filters.colorIds?.length > 1) return S.searchGroups = {}, S.loading = !1, void updateUI();
     try {
+
+
+        
         // Search in CSV data instead of API
         let o = searchInCSVData(e, 'parts');
         
@@ -503,12 +635,14 @@ async function searchRebrickableParts(e) {
         // Apply collection filter if specified
         S.filters.inCollectionOnly && (o = o.filter(e => S.coll[e.id] && Object.keys(S.coll[e.id]).length > 0));
         
-        const l = groupParts(o),
-            a = Object.entries(l).map(([t, o]) => ({
-                groupId: t,
-                partList: o,
-                bestScore: Math.max(...o.map(t => getRelevanceScore(t, e)))
-            }));
+        const l = groupParts(o);
+        console.log('Grouped parts:', Object.keys(l).length, 'groups');
+        
+        const a = Object.entries(l).map(([t, o]) => ({
+            groupId: t,
+            partList: o,
+            bestScore: Math.max(...o.map(t => getRelevanceScore(t, e)))
+        }));
         a.sort((e, t) => {
             if (t.bestScore !== e.bestScore) return t.bestScore - e.bestScore;
             return partCmp(e.partList[0], t.partList[0])
@@ -518,6 +652,7 @@ async function searchRebrickableParts(e) {
             e.bestScore > 0 && (i[e.groupId] = e.partList)
         }), S.searchGroups = i;
         
+        console.log('Final search groups:', Object.keys(i).length, 'groups');
 
     } catch (t) {
         console.error("CSV search failed:", t), S.err = t.message, S.searchGroups = {}
@@ -559,9 +694,9 @@ async function fetchSets() {
         
         // Apply sorting
         if (S.sortBy === "alpha_asc") {
-            results.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+            results.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'en'));
         } else if (S.sortBy === "alpha_desc") {
-            results.sort((a, b) => (b.name || '').localeCompare(a.name || ''));
+            results.sort((a, b) => (b.name || '').localeCompare(a.name || '', 'en'));
         } else if (S.sortBy === "year_asc") {
             results.sort((a, b) => (a.year || 0) - (b.year || 0));
         } else if (S.sortBy === "year_desc") {
@@ -604,9 +739,9 @@ async function fetchMinifigs() {
         
         // Apply sorting
         if (S.sortBy === "name_asc") {
-            results.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+            results.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'en'));
         } else if (S.sortBy === "name_desc") {
-            results.sort((a, b) => (b.name || '').localeCompare(a.name || ''));
+            results.sort((a, b) => (b.name || '').localeCompare(a.name || '', 'en'));
         } else if (S.sortBy === "num_parts_desc") {
             results.sort((a, b) => (b.num_parts || 0) - (a.num_parts || 0));
         } else if (S.sortBy === "num_parts_asc") {
@@ -727,6 +862,12 @@ async function fetchColorDetailsForPart(e) {
             });
         }
         PART_MAP[e].colorImages = o;
+        
+        // Update API loading statistics for images
+        const imageCount = Object.keys(o).length;
+        if (imageCount > 0) {
+            updateApiLoadingStats('images', imageCount);
+        }
         
         // Force save state after color details are fetched to persist color data immediately
         forceSaveState();
@@ -856,7 +997,11 @@ async function fetchMissingCollectionPartDetails() {
             const parts = await apiFetchPaginated(`/parts/?part_nums=${o.join(",")}`);
             
             if (parts && Array.isArray(parts)) {
-                parts.map(procPart).filter(Boolean);
+                const processedParts = parts.map(procPart).filter(Boolean);
+                // Update API loading statistics
+                if (processedParts.length > 0) {
+                    updateApiLoadingStats('parts', processedParts.length);
+                }
             }
         } catch (l) {
             console.error(`Could not fetch details for batch starting with part ${o[0]}:`, l);
@@ -874,11 +1019,17 @@ async function fetchMissingCollectionSetDetails() {
         try {
             const sets = await apiFetchPaginated(`/sets/?set_nums=${o.join(",")}`);
             if (sets && Array.isArray(sets)) {
-                sets.forEach(set => {
+                const validSets = sets.filter(set => set && set.set_num);
+                validSets.forEach(set => {
                     if (set && set.set_num) {
                         SET_MAP[set.set_num] = { ...SET_MAP[set.set_num], ...set };
                     }
                 });
+                
+                // Update API loading statistics
+                if (validSets.length > 0) {
+                    updateApiLoadingStats('sets', validSets.length);
+                }
             }
             // Persist updated set details cache for offline render
             saveState();
@@ -899,6 +1050,10 @@ async function fetchMinifigDetails(e) {
         if (!t.ok) throw new Error(`Minifig ${e} not found.`);
         const o = await t.json();
         MINIFIG_MAP[e] = o
+        
+        // Update API loading statistics
+        updateApiLoadingStats('minifigs', 1);
+        
         // Force save state after minifig details are fetched to persist minifig data immediately
         saveState();
         
@@ -1193,7 +1348,7 @@ function sortColorIds(e, t) {
         if (!n && r) return 1;
         const s = COLOR_MAP[e],
             c = COLOR_MAP[t];
-        return s && c ? s.name.localeCompare(c.name) : 0
+        return s && c ? s.name.localeCompare(c.name, 'en') : 0
     })
 }
 
@@ -1292,7 +1447,7 @@ function renderSidebar() {
             return e.sort((e, t) => {
                 const o = S.favThemeIds.has(e.id),
                     l = S.favThemeIds.has(t.id);
-                return o && !l ? -1 : !o && l ? 1 : e.name.localeCompare(t.name)
+                return o && !l ? -1 : !o && l ? 1 : e.name.localeCompare(t.name, 'en')
             }), e
         };
         o(e);
@@ -1345,7 +1500,7 @@ function renderSidebar() {
             Array.isArray(e.children) && e.children.sort((e, t) => {
                 const o = S.favCatIds.has(e.id),
                     l = S.favCatIds.has(t.id);
-                return o && !l ? -1 : !o && l ? 1 : e.name.localeCompare(t.name)
+                return o && !l ? -1 : !o && l ? 1 : e.name.localeCompare(t.name, 'en')
             })
         }), c = t + e.map(e => {
             const t = S.expCats.has(e.name),
@@ -1384,8 +1539,8 @@ function renderSidebar() {
     sidebarEl.innerHTML = `
         <div class="flex items-center justify-between mb-4 flex-shrink-0">
           <h1 class="text-xl font-bold text-white">Меню</h1>
-          <button id="sidebar-toggle" class="lg:hidden text-gray-300 hover:text-white mr-4 -ml-1 p-1">
-            ${I_Menu("w-6 h-6")}
+          <button id="sidebar-close" class="lg:hidden text-gray-300 hover:text-white p-1">
+            ${I_X("w-6 h-6")}
           </button>
         </div>
 
@@ -1455,13 +1610,6 @@ function renderHeader() {
     let t = "Поиск по ID или названию...";
     "sets" === e && (t = "Поиск по наборам..."), "minifigs" === e && (t = "Поиск по минифигуркам...");
     
-    const loadingIndicator = S.sidebarLoading ? `
-        <div class="flex items-center text-blue-400 text-sm">
-            <div class="loader !w-4 !h-4 !border-2 mr-2"></div>
-            <span>Загрузка данных...</span>
-        </div>
-    ` : '';
-    
     headerEl.innerHTML = `
             <div class="flex justify-between items-center gap-4">
                 <div class="flex items-center">
@@ -1469,8 +1617,6 @@ function renderHeader() {
                         ${I_Menu("w-6 h-6")}
                     </button>
                     <h1 class="text-xl font-bold text-white hidden sm:block">LEGO® Catalog</h1>
-                    <div class="text-xs text-green-400 ml-2 hidden sm:block">(CSV + API)</div>
-                <div class="text-xs text-blue-400 ml-2 hidden sm:block">Изображения: из inventory_parts.csv, fallback по кнопке</div>
                 </div>
                 <div class="flex items-center space-x-2 w-full max-w-sm">
                     <div class="relative flex-grow">
@@ -1483,13 +1629,8 @@ function renderHeader() {
                     <button id="filter-button" class="p-2 bg-gray-600 text-white rounded-md hover:bg-gray-500 transition-colors flex-shrink-0" aria-label="Фильтры">
                         ${I_Filter("w-5 h-5")}
                     </button>
-                    ${S.view === 'collection' && S.subView === 'parts' ? `
-                        <button id="refresh-images-button" class="p-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed" aria-label="Обновить изображения" title="Принудительно обновить изображения деталей">
-                            <span id="refresh-images-icon">${I_Refresh("w-5 h-5")}</span>
-                        </button>
-                    ` : ''}
+
                 </div>
-                ${loadingIndicator}
             </div>
         `
 }
@@ -1725,10 +1866,10 @@ function renderMainContent() {
             let n = Object.values(i).flat();
             switch (S.sortBy) {
                 case "alpha_asc":
-                    n.sort((e, t) => e.name.localeCompare(t.name));
+                    n.sort((e, t) => e.name.localeCompare(t.name, 'en'));
                     break;
                 case "alpha_desc":
-                    n.sort((e, t) => t.name.localeCompare(e.name));
+                    n.sort((e, t) => t.name.localeCompare(e.name, 'en'));
                     break;
                 case "popularity":
                     n.sort((e, t) => t.num_sets - e.num_sets)
@@ -1743,6 +1884,12 @@ function renderMainContent() {
         } else "sets" === S.subView ? (t = S.q ? S.searchSetRes : S.setRes, o = e => renderSetCard(e, S.gridStale), l = S.q ? "По вашему запросу ничего не найдено." : "Выберите тему для просмотра наборов.") : (t = S.q ? S.searchMinifigRes : S.minifigRes, o = e => renderMinifigCard(e, S.gridStale), l = S.q ? "По вашему запросу ничего не найдено." : "catalog" === S.view && !S.q ? "Используйте поиск для нахождения минифигурок." : "В коллекции нет минифигурок.");
         if (!t || 0 === t.length) e = `
                     <div class="flex flex-col items-center justify-center h-full p-4 text-center">
+                        ${S.sidebarLoading ? `
+                            <div class="flex items-center text-blue-400 text-sm mb-6">
+                                <div class="loader !w-6 !h-6 !border-2 mr-3"></div>
+                                <span>Загрузка данных...</span>
+                            </div>
+                        ` : ''}
                         <p class="text-gray-400 max-w-sm mb-6">${l}</p>
                         <button id="feeling-lucky-button" class="flex items-center gap-3 bg-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-blue-700 transition-all duration-200 transform hover:scale-105 shadow-lg">
                             ${I_Dice("w-6 h-6")} Мне повезёт!
@@ -1790,10 +1937,10 @@ function renderMainContent() {
             t = filteredParts;
             switch (S.sortBy) {
                 case "alpha_asc":
-                    t.sort((e, t) => e.part.name.localeCompare(t.part.name));
+                    t.sort((e, t) => e.part.name.localeCompare(t.part.name, 'en'));
                     break;
                 case "alpha_desc":
-                    t.sort((e, t) => t.part.name.localeCompare(e.part.name));
+                    t.sort((e, t) => t.part.name.localeCompare(e.part.name, 'en'));
                     break;
                 case "quantity_desc":
                     t.sort((a, b) => b.quantity - a.quantity);
@@ -1835,10 +1982,10 @@ function renderMainContent() {
             t = sets;
             switch (S.sortBy) {
                 case "alpha_asc":
-                    t.sort((e, t) => e.name.localeCompare(t.name));
+                    t.sort((e, t) => e.name.localeCompare(t.name, 'en'));
                     break;
                 case "alpha_desc":
-                    t.sort((e, t) => t.name.localeCompare(e.name));
+                    t.sort((e, t) => t.name.localeCompare(t.name, 'en'));
                     break;
                 case "year_asc":
                     t.sort((e, t) => e.year - t.year);
@@ -1867,10 +2014,10 @@ function renderMainContent() {
             
             switch (S.sortBy) {
                 case "name_asc":
-                    t.sort((e, t) => e.name.localeCompare(t.name));
+                    t.sort((e, t) => e.name.localeCompare(t.name, 'en'));
                     break;
                 case "name_desc":
-                    t.sort((e, t) => t.name.localeCompare(e.name));
+                    t.sort((e, t) => t.name.localeCompare(e.name, 'en'));
                     break;
                 case "num_parts_desc":
                     t.sort((e, t) => t.num_parts - e.num_parts);
@@ -1883,7 +2030,15 @@ function renderMainContent() {
         if (t.length === 0) {
             (i || "parts" === S.subView && (S.filters.colorIds.length > 0 || S.selCollCatId) || "sets" === S.subView && S.selCollThemeId) && (l += ", соответствующих фильтрам");
             l += ".";
-            e = `<div class="flex items-center justify-center h-full p-4 text-center"><p class="text-gray-400">${l}</p></div>`;
+            e = `<div class="flex flex-col items-center justify-center h-full p-4 text-center">
+                    ${S.sidebarLoading ? `
+                        <div class="flex items-center text-blue-400 text-sm mb-6">
+                            <div class="loader !w-6 !h-6 !border-2 mr-3"></div>
+                            <span>Загрузка данных...</span>
+                        </div>
+                    ` : ''}
+                    <p class="text-gray-400">${l}</p>
+                </div>`;
         } else {
             S.hasMoreItems = t.length > S.toDisplay;
             const l = t.slice(0, S.toDisplay);
@@ -1928,7 +2083,7 @@ function renderSetCollectionControls() {
                     
                     <div class="flex justify-between items-center gap-4">
                         <div class="flex items-center gap-2">
-                            <button data-action="decrease-set-qty" class="p-2 rounded-full bg-gray-600 hover:bg-gray-500 text-white transition-colors">${I_Minus("w-5 h-5")}</button>
+                            <button data-action="decrease-set-qty" class="p-2 rounded-full ${e > 0 ? 'bg-gray-600 hover:bg-gray-500' : 'bg-gray-700 cursor-not-allowed'} text-white transition-colors" ${e <= 0 ? 'disabled' : ''}>${I_Minus("w-5 h-5")}</button>
                             <input id="set-modal-quantity-input" type="number" value="${e}" readonly class="w-12 text-center bg-gray-900 text-white font-bold rounded-md py-1"/>
                             <button data-action="increase-set-qty" class="p-2 rounded-full bg-gray-600 hover:bg-gray-500 text-white transition-colors">${I_Plus("w-5 h-5")}</button>
                         </div>
@@ -2195,13 +2350,21 @@ function renderModal() {
     o?.length > 1 && (a = `
                 <div>
                     <label for="variation-select" class="block text-sm font-medium text-gray-400 mb-2">Вариация</label>
-                    <select id="variation-select" class="w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        ${o.map(e=>`
-                            <option value="${e.id}" ${e.id===S.selPartId?"selected":""}>
-                                ${e.name}
-                            </option>
-                        `).join("")}
-                    </select>
+                    <div class="relative variation-select-container">
+                        <button id="variation-select-button" class="w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer pr-10 text-left flex justify-between items-center hover:bg-gray-600 transition-colors duration-200">
+                            <span id="variation-select-text" class="truncate flex-1">${o.find(e => e.id === S.selPartId)?.name || o[0]?.name || ''}</span>
+                            <svg class="w-4 h-4 text-gray-400 transition-transform duration-200 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                        </button>
+                        <div id="variation-dropdown" class="absolute bg-gray-700 border border-gray-600 rounded-md shadow-lg z-[99999] max-h-60 overflow-y-auto" style="display: none; background-color: #374151; border: 1px solid #4B5563; border-radius: 6px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); min-width: 200px;">
+                            ${o.map(e=>`
+                                <div data-value="${e.id}" class="variation-option px-3 py-2 text-white hover:bg-gray-600 cursor-pointer transition-colors duration-150 ${e.id===S.selPartId?'selected':''}">
+                                    <span class="truncate block">${e.name}</span>
+                                </div>
+                            `).join("")}
+                        </div>
+                    </div>
                 </div>
             `), document.body.classList.add("overflow-hidden"), partModalEl.classList.remove("modal-hidden"), requestAnimationFrame(() => {
         partModalEl.classList.add("visible")
@@ -2240,7 +2403,7 @@ function renderModal() {
                         
                         <div>
                           <h3 class="text-md font-semibold text-gray-300 mb-3">Доступные цвета</h3>
-                           <div id="color-selector-container">${renderColorSelector()}</div>
+                           <div id="color-selector-container" class="min-h-[200px]">${renderColorSelector()}</div>
                         </div>
                         
                         <div id="modal-controls-container">${renderModalControls()}</div>
@@ -2250,7 +2413,153 @@ function renderModal() {
         </div>
         `, updateModalPartially({
         image: !0
-    })
+    });
+    
+    // Add event listener for custom variation selector
+    const variationSelectButton = document.getElementById("variation-select-button");
+    const variationDropdown = document.getElementById("variation-dropdown");
+    const variationSelectText = document.getElementById("variation-select-text");
+    
+    if (variationSelectButton && variationDropdown) {
+        console.log('Variation elements found:', {
+            button: variationSelectButton,
+            dropdown: variationDropdown,
+            text: variationSelectText
+        });
+        
+
+        
+        // Toggle dropdown
+        variationSelectButton.addEventListener("click", (event) => {
+            event.preventDefault();
+            console.log('Variation button clicked');
+            const isOpen = variationDropdown.style.display !== 'none';
+            console.log('Is dropdown open:', isOpen);
+            
+            if (!isOpen) {
+                // Показываем выпадающий список
+                variationDropdown.style.display = 'block';
+                variationSelectButton.classList.add('open');
+                
+                // Позиционируем выпадающий список точно под кнопкой
+                const buttonRect = variationSelectButton.getBoundingClientRect();
+                const modalContainer = document.querySelector('#modal-content');
+                const modalRect = modalContainer.getBoundingClientRect();
+                
+                // Устанавливаем позицию выпадающего списка относительно модального окна
+                variationDropdown.style.position = 'absolute';
+                variationDropdown.style.left = '0px';
+                variationDropdown.style.top = '100%';
+                variationDropdown.style.marginTop = '4px';
+                variationDropdown.style.width = '100%';
+                variationDropdown.style.minWidth = '100%';
+                
+                console.log('Dropdown positioned at:', {
+                    position: 'absolute',
+                    left: '0px',
+                    top: '100%',
+                    width: '100%',
+                    buttonWidth: buttonRect.width,
+                    modalWidth: modalRect.width
+                });
+            } else {
+                variationDropdown.style.display = 'none';
+                variationSelectButton.classList.remove('open');
+                console.log('Dropdown closed');
+            }
+        });
+        
+        // Handle option selection
+        variationDropdown.addEventListener("click", (event) => {
+            const option = event.target.closest('.variation-option');
+            if (option) {
+                const selectedVariationId = option.dataset.value;
+                const selectedVariation = S.partModal.variants?.find(v => v.id === selectedVariationId);
+                
+                if (selectedVariation && selectedVariation.id !== S.selPartId) {
+                    // Update selected part ID to the new variation
+                    S.selPartId = selectedVariationId;
+                    
+                    // Update button text
+                    variationSelectText.textContent = selectedVariation.name;
+                    
+                    // Update option styling
+                    variationDropdown.querySelectorAll('.variation-option').forEach(opt => {
+                        opt.classList.remove('selected');
+                    });
+                    option.classList.add('selected');
+                    
+                    // Close dropdown
+                    variationDropdown.style.display = 'none';
+                    variationSelectButton.classList.remove('open');
+                    
+                    // Update part modal data for the new variation
+                    const newPart = PART_MAP[selectedVariationId];
+                    if (newPart) {
+                        S.partModal.imgUrl = newPart.rebrickable_img_url || null;
+                        S.partModal.selColorId = null;
+                        S.partModal.qty = 0;
+                        
+                        // Update image
+                        updateModalPartially({
+                            image: true
+                        });
+                        
+                        // Update modal title to show selected variation name
+                        const modalTitle = document.querySelector('#modal-content h2');
+                        if (modalTitle) {
+                            modalTitle.textContent = selectedVariation.name;
+                        }
+                        
+                        // Fetch colors for the new variation
+                        if (newPart.availableColorIds && newPart.availableColorIds.length > 0) {
+                            S.partModal.selColorId = sortColorIds(newPart.availableColorIds, newPart.id)[0];
+                            S.partModal.qty = S.coll[selectedVariationId]?.[S.partModal.selColorId] || 0;
+                            updateModalPartially({
+                                colors: true,
+                                controls: true
+                            });
+                            fetchPartColorSpecifics(newPart.id, S.partModal.selColorId);
+                        } else {
+                            fetchPartColors(newPart.id);
+                        }
+                    }
+                }
+            }
+        });
+        
+        // Close dropdown when clicking outside
+        document.addEventListener("click", (event) => {
+            if (!variationSelectButton.contains(event.target) && !variationDropdown.contains(event.target)) {
+                variationDropdown.style.display = 'none';
+                variationSelectButton.classList.remove('open');
+            }
+        });
+        
+        // Close dropdown on escape key
+        document.addEventListener("keydown", (event) => {
+            if (event.key === "Escape") {
+                variationDropdown.style.display = 'none';
+                variationSelectButton.classList.remove('open');
+            }
+        });
+        
+        // Close dropdown on scroll (important for fixed positioning)
+        window.addEventListener("scroll", () => {
+            if (variationDropdown.style.display !== 'none') {
+                variationDropdown.style.display = 'none';
+                variationSelectButton.classList.remove('open');
+            }
+        });
+        
+        // Close dropdown on window resize
+        window.addEventListener("resize", () => {
+            if (variationDropdown.style.display !== 'none') {
+                variationDropdown.style.display = 'none';
+                variationSelectButton.classList.remove('open');
+            }
+        });
+    }
 }
 
 function renderColorSelector() {
@@ -2296,7 +2605,7 @@ function renderModalControls() {
                     
                     <div class="flex justify-between items-center gap-3">
                         <div class="flex items-center gap-1.5">
-                            <button data-action="decrease-qty" class="p-2 rounded-full bg-gray-600 hover:bg-gray-500 text-white transition-colors">${I_Minus("w-5 h-5")}</button>
+                            <button data-action="decrease-qty" class="p-2 rounded-full ${t > 0 ? 'bg-gray-600 hover:bg-gray-500' : 'bg-gray-700 cursor-not-allowed'} text-white transition-colors" ${t <= 0 ? 'disabled' : ''}>${I_Minus("w-5 h-5")}</button>
                             <input id="modal-quantity-input" type="number" value="${t}" readonly class="w-12 text-center bg-gray-900 text-white font-bold rounded-md py-1"/>
                             <button data-action="increase-qty" class="p-2 rounded-full bg-gray-600 hover:bg-gray-500 text-white transition-colors">${I_Plus("w-5 h-5")}</button>
                         </div>
@@ -2369,17 +2678,17 @@ function renderFilterModal() {
                         <div class="grid grid-cols-2 gap-3">
                             <div>
                                 <label for="min-year" class="block text-sm font-medium text-gray-400 mb-1">Мин. год</label>
-                                <input type="number" id="min-year" value="${tempFilters.setFilters.minYear}" data-filter-key="minYear" class="w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <input type="number" id="min-year" value="${tempFilters.setFilters.minYear}" data-filter-key="minYear" class="w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500" data-action="modal-set-filter">
                             </div>
                              <div>
                                 <label for="max-year" class="block text-sm font-medium text-gray-400 mb-1">Макс. год</label>
-                                <input type="number" id="max-year" value="${tempFilters.setFilters.maxYear}" data-filter-key="maxYear" class="w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <input type="number" id="max-year" value="${tempFilters.setFilters.maxYear}" data-filter-key="maxYear" class="w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500" data-action="modal-set-filter">
                             </div>
                         </div>
                         <div class="grid grid-cols-2 gap-3">
                             <div>
                                 <label for="min-parts" class="block text-sm font-medium text-gray-400 mb-1">Мин. деталей</label>
-                                <input type="number" id="min-parts" value="${tempFilters.setFilters.minParts}" data-filter-key="minParts" class="w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <input type="number" id="min-parts" value="${tempFilters.setFilters.minParts}" data-filter-key="minParts" class="w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500" data-action="modal-set-filter">
                             </div>
                              <div>
                                 <label for="max-parts" class="block text-sm font-medium text-gray-400 mb-1">Макс. деталей</label>
@@ -2481,7 +2790,7 @@ function renderFilterModal() {
                         </label>
                     </div>
                 </div>
-            ` : "", l = Object.keys(COLOR_MAP).sort((e, t) => COLOR_MAP[e].name.localeCompare(COLOR_MAP[t].name)).map(e => {
+                            ` : "", l = Object.keys(COLOR_MAP).sort((e, t) => COLOR_MAP[e].name.localeCompare(COLOR_MAP[t].name, 'en')).map(e => {
             const t = COLOR_MAP[e],
                 o = tempFilters.filters.colorIds.includes(e);
             return `<button data-action="modal-set-color" data-color-id="${e}" title="${t.name}" class="w-8 h-8 rounded-full border-2 transition-transform duration-150 overflow-hidden flex-shrink-0 ${t.isTransparent?"checkerboard":""} ${o?"border-blue-500 scale-110":"border-gray-600 hover:border-gray-400"}" style="background-color: ${t.hex};"></button>`
@@ -2538,6 +2847,11 @@ function renderSettingsModal() {
                 <div class="flex gap-2">
                     <button data-action="cancel-delete" class="w-full flex items-center justify-center px-3 py-2 text-sm font-semibold rounded-md transition-colors duration-150 bg-gray-600 hover:bg-gray-500 text-white">Отмена</button>
                     <button data-action="confirm-delete-parts" class="w-full flex items-center justify-center px-3 py-2 text-sm font-semibold rounded-md transition-colors duration-150 bg-red-800 hover:bg-red-700 text-white">Подтвердить удаление</button>
+                </div>` : "all" === e ? `
+                <p class="text-yellow-300 text-sm text-center mb-2">Вы уверены? Это действие необратимо и удалит ВСЕ данные.</p>
+                <div class="flex gap-2">
+                    <button data-action="cancel-delete" class="w-full flex items-center justify-center px-3 py-2 text-sm font-semibold rounded-md transition-colors duration-150 bg-gray-600 hover:bg-gray-500 text-white">Отмена</button>
+                    <button data-action="confirm-delete-all" class="w-full flex items-center justify-center px-3 py-2 text-sm font-semibold rounded-md transition-colors duration-150 bg-red-800 hover:bg-red-700 text-white">Подтвердить удаление ВСЕГО</button>
                 </div>` : `<button data-action="delete-all-parts" class="w-full flex items-center justify-center px-3 py-2 text-sm font-semibold rounded-md transition-colors duration-150 bg-red-600 hover:bg-red-700 text-white ${0===l?"opacity-50 cursor-not-allowed":""}" ${0===l?"disabled":""}>${I_Trash("w-5 h-5 mr-2")} Удалить все детали</button>`;
     let r = "";
     r = "sets" === e ? `
@@ -2545,6 +2859,11 @@ function renderSettingsModal() {
                 <div class="flex gap-2">
                     <button data-action="cancel-delete" class="w-full flex items-center justify-center px-3 py-2 text-sm font-semibold rounded-md transition-colors duration-150 bg-gray-600 hover:bg-gray-500 text-white">Отмена</button>
                     <button data-action="confirm-delete-sets" class="w-full flex items-center justify-center px-3 py-2 text-sm font-semibold rounded-md transition-colors duration-150 bg-red-800 hover:bg-red-700 text-white">Подтвердить удаление</button>
+                </div>` : "all" === e ? `
+                <p class="text-yellow-300 text-sm text-center mb-2">Вы уверены? Это действие необратимо и удалит ВСЕ данные.</p>
+                <div class="flex gap-2">
+                    <button data-action="cancel-delete" class="w-full flex items-center justify-center px-3 py-2 text-sm font-semibold rounded-md transition-colors duration-150 bg-gray-600 hover:bg-gray-500 text-white">Отмена</button>
+                    <button data-action="confirm-delete-all" class="w-full flex items-center justify-center px-3 py-2 text-sm font-semibold rounded-md transition-colors duration-150 bg-red-800 hover:bg-red-700 text-white">Подтвердить удаление ВСЕГО</button>
                 </div>` : `<button data-action="delete-all-sets" class="w-full flex items-center justify-center px-3 py-2 text-sm font-semibold rounded-md transition-colors duration-150 bg-red-600 hover:bg-red-700 text-white ${0===a?"opacity-50 cursor-not-allowed":""}" ${0===a?"disabled":""}>${I_Trash("w-5 h-5 mr-2")} Удалить все наборы</button>`;
     let s = "";
     s = "minifigs" === e ? `
@@ -2552,6 +2871,11 @@ function renderSettingsModal() {
                 <div class="flex gap-2">
                     <button data-action="cancel-delete" class="w-full flex items-center justify-center px-3 py-2 text-sm font-semibold rounded-md transition-colors duration-150 bg-gray-600 hover:bg-gray-500 text-white">Отмена</button>
                     <button data-action="confirm-delete-minifigs" class="w-full flex items-center justify-center px-3 py-2 text-sm font-semibold rounded-md transition-colors duration-150 bg-red-800 hover:bg-red-700 text-white">Подтвердить удаление</button>
+                </div>` : "all" === e ? `
+                <p class="text-yellow-300 text-sm text-center mb-2">Вы уверены? Это действие необратимо и удалит ВСЕ данные.</p>
+                <div class="flex gap-2">
+                    <button data-action="cancel-delete" class="w-full flex items-center justify-center px-3 py-2 text-sm font-semibold rounded-md transition-colors duration-150 bg-gray-600 hover:bg-gray-500 text-white">Отмена</button>
+                    <button data-action="confirm-delete-all" class="w-full flex items-center justify-center px-3 py-2 text-sm font-semibold rounded-md transition-colors duration-150 bg-red-800 hover:bg-red-700 text-white">Подтвердить удаление ВСЕГО</button>
                 </div>` : `<button data-action="delete-all-minifigs" class="w-full flex items-center justify-center px-3 py-2 text-sm font-semibold rounded-md transition-colors duration-150 bg-red-600 hover:bg-red-700 text-white ${0===i?"opacity-50 cursor-not-allowed":""}" ${0===i?"disabled":""}>${I_Trash("w-5 h-5 mr-2")} Удалить все минифигурки</button>`;
     const c = "error" === o ? "bg-red-900/50 text-red-300" : "success" === o ? "bg-green-900/50 text-green-300" : "bg-blue-900/50 text-blue-300";
     settingsModalEl.innerHTML = `
@@ -2562,18 +2886,10 @@ function renderSettingsModal() {
                 </div>
                 <div class="flex-grow p-4 overflow-y-auto no-scrollbar space-y-6">
                      <div>
-                        <h3 class="text-md font-semibold text-gray-300 mb-2">Импорт / Экспорт</h3>
+                        <h3 class="text-md font-semibold text-gray-300 mb-2">Импорт и экспорт CSV</h3>
                          ${t?`<div id="import-export-status" class="mb-2 p-2 text-sm rounded-md ${c}">${t}</div>`:'<div id="import-export-status" class="mb-2"></div>'}
                         <div class="bg-gray-900/50 rounded-lg p-3 space-y-3">
-                            <p class="text-xs text-gray-400">Сохраните вашу коллекцию и кеш (изображения, данные) в .zip файл или загрузите их. Импорт объединит данные с вашей текущей коллекцией.</p>
-                            <div class="flex gap-3 mb-3">
-                                <button data-action="import-zip" class="w-full flex items-center justify-center px-3 py-2 text-sm font-semibold rounded-md transition-colors duration-150 bg-blue-600 hover:bg-blue-700 text-white">
-                                    ${I_Up("w-5 h-5 mr-2")} Импорт (.zip)
-                                </button>
-                                <button data-action="export-zip" class="w-full flex items-center justify-center px-3 py-2 text-sm font-semibold rounded-md transition-colors duration-150 bg-green-600 hover:bg-green-700 text-white">
-                                    ${I_Down("w-5 h-5 mr-2")} Экспорт (.zip)
-                                </button>
-                            </div>
+                            <p class="text-xs text-gray-400">Импорт и экспорт вашей коллекции в формате CSV. Импорт объединит данные с вашей текущей коллекцией.</p>
                             <div class="flex gap-3">
                                 <button data-action="import-csv" class="w-full flex items-center justify-center px-3 py-2 text-sm font-semibold rounded-md transition-colors duration-150 bg-purple-600 hover:bg-purple-700 text-white">
                                     ${I_Up("w-5 h-5 mr-2")} Импорт (.csv)
@@ -2587,6 +2903,9 @@ function renderSettingsModal() {
                      <div>
                         <h3 class="text-md font-semibold text-gray-300 mb-2">Опасная зона</h3>
                         <div class="bg-red-900/20 border border-red-500/30 rounded-lg p-3 space-y-3">
+                           ${"all" !== e ? `<button data-action="delete-all-data" class="w-full flex items-center justify-center px-3 py-2 text-sm font-semibold rounded-md transition-colors duration-150 bg-red-800 hover:bg-red-700 text-white mb-3">
+                               ${I_Trash("w-5 h-5 mr-2")} Удалить всё
+                           </button>` : ""}
                            ${n}
                            ${r}
                            ${s}
@@ -2598,6 +2917,7 @@ function renderSettingsModal() {
                             <div class="text-green-400 text-xs mb-2">✓ Все данные загружаются из CSV файлов</div>
                             ${(() => {
                                 const stats = getLoadingStats();
+                                const lastUpdate = stats.lastApiUpdate ? new Date(stats.lastApiUpdate).toLocaleString('ru-RU') : 'Никогда';
                                 return `
                                     <div class="grid grid-cols-2 gap-2 text-xs">
                                         <div class="text-gray-400">Цвета:</div>
@@ -2613,45 +2933,30 @@ function renderSettingsModal() {
                                         <div class="text-gray-400">Минифигурки:</div>
                                         <div class="text-white">${stats.minifigs} (${stats.minifigsWithImages} с изображениями)</div>
                                     </div>
+                                    <div class="text-yellow-400 text-xs mt-3 pt-2 border-t border-gray-700/50">
+                                        <strong>Данные через API:</strong>
+                                    </div>
+                                    <div class="grid grid-cols-2 gap-2 text-xs text-yellow-300">
+                                        <div class="text-gray-400">Цвета:</div>
+                                        <div class="text-white">${stats.apiColors}</div>
+                                        <div class="text-gray-400">Детали:</div>
+                                        <div class="text-white">${stats.apiParts}</div>
+                                        <div class="text-gray-400">Наборы:</div>
+                                        <div class="text-white">${stats.apiSets}</div>
+                                        <div class="text-gray-400">Минифигурки:</div>
+                                        <div class="text-white">${stats.apiMinifigs}</div>
+                                        <div class="text-gray-400">Изображения:</div>
+                                        <div class="text-white">${stats.apiImages}</div>
+                                    </div>
                                     <div class="text-blue-400 text-xs mt-2">
-                                        API используется только для проверки новых данных и загрузки изображений
+                                        Последнее обновление API: ${lastUpdate}
                                     </div>
                                 `;
                             })()}
                         </div>
                     </div>
-                    <div>
-                        <h3 class="text-md font-semibold text-gray-300 mb-2">Обновление данных</h3>
-                        <div class="bg-gray-900/50 rounded-lg p-3 space-y-3">
-                            <p class="text-xs text-gray-400">Обновите данные для минифигурок, если они отображаются как #undefined</p>
-                            <button data-action="refresh-minifig-data" class="w-full flex items-center justify-center px-3 py-2 text-sm font-semibold rounded-md transition-colors duration-150 bg-blue-600 hover:bg-blue-700 text-white">
-                                ${I_Refresh("w-5 h-5 mr-2")} Обновить данные минифигурок
-                            </button>
-                            <button data-action="reload-csv-data" class="w-full flex items-center justify-center px-3 py-2 text-sm font-semibold rounded-md transition-colors duration-150 bg-green-600 hover:bg-green-700 text-white">
-                                ${I_Refresh("w-5 h-5 mr-2")} Перезагрузить данные из CSV
-                            </button>
-                            <button data-action="load-missing-api-data" class="w-full flex items-center justify-center px-3 py-2 text-sm font-semibold rounded-md transition-colors duration-150 bg-purple-600 hover:bg-purple-700 text-white">
-                                ${I_Refresh("w-5 h-5 mr-2")} Загрузить недостающие данные из API
-                            </button>
-                            <button data-action="force-reload-csv" class="w-full flex items-center justify-center px-3 py-2 text-sm font-semibold rounded-md transition-colors duration-150 bg-orange-600 hover:bg-orange-700 text-white">
-                                ${I_Refresh("w-5 h-5 mr-2")} Принудительно перезагрузить CSV
-                            </button>
-                        </div>
-                    </div>
-                    <div>
-                        <h3 class="text-md font-semibold text-gray-300 mb-2">Производительность</h3>
-                        <div class="bg-gray-900/50 rounded-lg p-3 space-y-3">
-                            <p class="text-xs text-gray-400">Настройки для улучшения производительности загрузки</p>
-                            <div class="flex items-center justify-between">
-                                <span class="text-sm text-gray-300">Отключить загрузку изображений для каждого цвета</span>
-                                <label class="relative inline-flex items-center cursor-pointer">
-                                    <input type="checkbox" id="disable-color-images" class="sr-only peer" ${localStorage.getItem('disableColorSpecificImages') === 'true' ? 'checked' : ''}>
-                                    <div class="w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                                </label>
-                            </div>
-                            <p class="text-xs text-gray-400">Отключение ускорит загрузку коллекции, но детали будут отображаться в базовом цвете</p>
-                        </div>
-                    </div>
+
+
                     <div>
                         <h3 class="text-md font-semibold text-gray-300 mb-2">Управление кэшем</h3>
                         <div class="bg-gray-900/50 rounded-lg p-3 space-y-3">
@@ -2685,10 +2990,14 @@ function renderSettingsModal() {
 
 function updateFilterModalUI() {
     if (!S.filterOpen || !filterModalEl.innerHTML) return;
+    
+    // Update sort options
     filterModalEl.querySelectorAll('input[name="sort"]').forEach(e => {
         const input = e;
         input.checked = tempFilters.sortBy === input.value;
     });
+    
+    // Update parts filters
     if ("parts" === S.subView) {
         const e = filterModalEl.querySelector('input[data-action="modal-toggle-collection"]');
         e && (e.checked = tempFilters.filters.inCollectionOnly);
@@ -2703,6 +3012,19 @@ function updateFilterModalUI() {
                 l && (e.className = `w-8 h-8 rounded-full border-2 transition-transform duration-150 overflow-hidden flex-shrink-0 ${l.isTransparent?"checkerboard":""} ${o?"border-blue-500 scale-110":"border-gray-600 hover:border-gray-400"}`)
             }
         })
+    }
+    
+    // Update sets filters
+    if ("sets" === S.subView) {
+        const minYearInput = filterModalEl.querySelector('input[id="min-year"]');
+        const maxYearInput = filterModalEl.querySelector('input[id="max-year"]');
+        const minPartsInput = filterModalEl.querySelector('input[id="min-parts"]');
+        const maxPartsInput = filterModalEl.querySelector('input[id="max-parts"]');
+        
+        if (minYearInput) minYearInput.value = tempFilters.setFilters.minYear || "";
+        if (maxYearInput) maxYearInput.value = tempFilters.setFilters.maxYear || "";
+        if (minPartsInput) minPartsInput.value = tempFilters.setFilters.minParts || "";
+        if (maxPartsInput) maxPartsInput.value = tempFilters.setFilters.maxParts || "";
     }
 }
 
@@ -2808,7 +3130,7 @@ function renderMinifigModalDetailsView() {
                 
                 <div class="flex justify-between items-center gap-4">
                     <div class="flex items-center gap-2">
-                        <button data-action="decrease-minifig-qty" class="p-2 rounded-full bg-gray-600 hover:bg-gray-500 text-white transition-colors">${I_Minus("w-5 h-5")}</button>
+                        <button data-action="decrease-minifig-qty" class="p-2 rounded-full ${t > 0 ? 'bg-gray-600 hover:bg-gray-500' : 'bg-gray-700 cursor-not-allowed'} text-white transition-colors" ${t <= 0 ? 'disabled' : ''}>${I_Minus("w-5 h-5")}</button>
                         <input type="number" value="${t}" readonly class="w-12 text-center bg-gray-900 text-white font-bold rounded-md py-1"/>
                         <button data-action="increase-minifig-qty" class="p-2 rounded-full bg-gray-600 hover:bg-gray-500 text-white transition-colors">${I_Plus("w-5 h-5")}</button>
                     </div>
@@ -2915,8 +3237,27 @@ function renderMinifigModalInventoryView() {
 
 function updateUI() {
     renderSidebar(), renderHeader(), renderMainContent();
+    
+    // Setup search input event listener (only for updating S.q, not auto-search)
+    const searchInput = document.getElementById('search-input');
+    if (searchInput && !searchInput.hasAttribute('data-search-listener')) {
+        searchInput.setAttribute('data-search-listener', 'true');
+        searchInput.addEventListener('input', (e) => {
+            S.q = e.target.value;
+        });
+    }
+    
     const e = window.innerWidth < 1024;
     e ? S.sidebarOpen ? (sidebarEl.classList.remove("-translate-x-full"), backdropEl.classList.remove("hidden"), document.body.style.overflow = "hidden") : (sidebarEl.classList.add("-translate-x-full"), backdropEl.classList.add("hidden"), document.body.style.overflow = "") : (sidebarEl.classList.remove("-translate-x-full"), backdropEl.classList.add("hidden"), document.body.style.overflow = "")
+    
+    // Setup backdrop click handler
+    if (backdropEl && !backdropEl.hasAttribute('data-backdrop-listener')) {
+        backdropEl.setAttribute('data-backdrop-listener', 'true');
+        backdropEl.addEventListener('click', () => {
+            S.sidebarOpen = false;
+            updateUI();
+        });
+    }
 }
 
 function generateCsvData() {
@@ -2965,44 +3306,12 @@ function generateCsvData() {
     }
     return o;
 }
-async function exportCollectionAndCacheToZip() {
-    S.settingsModal.status = "Подготовка данных...", S.settingsModal.statusType = "info", renderSettingsModal();
-    try {
-        const zip = new JSZip();
-        
-        // Export only user collections (not cached data)
-        S.settingsModal.status = "Экспорт коллекции в CSV...", renderSettingsModal();
-        const csvData = generateCsvData();
-        zip.file("collection.csv", csvData);
-        
-        // No image cache export - we only export collections and favorites
-        S.settingsModal.status = "Подготовка архива...", renderSettingsModal();
-        
-        const zipBlob = await zip.generateAsync({
-            type: "blob"
-        });
-        
-        const link = document.createElement("a");
-        link.href = URL.createObjectURL(zipBlob);
-        link.download = `lego-collection-backup-${new Date().toISOString().slice(0, 10)}.zip`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(link.href);
-        
-        S.settingsModal.status = "Экспорт успешно завершен!", S.settingsModal.statusType = "success";
-        renderSettingsModal();
-    } catch (e) {
-        console.error("ZIP Export failed:", e);
-        S.settingsModal.status = `Ошибка экспорта: ${e.message}`, S.settingsModal.statusType = "error";
-        renderSettingsModal();
-    }
-}
+
 
 // Function to export collection to CSV
 function exportCollectionToCSV() {
     try {
-        S.settingsModal.status = "Подготовка CSV файла...", S.settingsModal.statusType = "info", renderSettingsModal();
+        updateSettingsModalStatus("Подготовка CSV файла...", "info");
         
         const csvData = generateCsvData();
         
@@ -3015,8 +3324,7 @@ function exportCollectionToCSV() {
         document.body.removeChild(link);
         URL.revokeObjectURL(link.href);
         
-        S.settingsModal.status = "Экспорт CSV успешно завершен!", S.settingsModal.statusType = "success";
-        renderSettingsModal();
+        updateSettingsModalStatus("Экспорт CSV успешно завершен!", "success");
     } catch (e) {
         console.error("CSV Export failed:", e);
         S.settingsModal.status = `Ошибка экспорта CSV: ${e.message}`, S.settingsModal.statusType = "error";
@@ -3025,9 +3333,15 @@ function exportCollectionToCSV() {
 }
 async function processCsvData(content) {
     const t = (e, t) => {
-        S.settingsModal.status = e, S.settingsModal.statusType = t, renderSettingsModal();
+        updateSettingsModalStatus(e, t);
         "error" !== t && setTimeout(() => {
-            S.settingsOpen && S.settingsModal.status === e && (S.settingsModal.status = "", renderSettingsModal())
+            if (S.settingsOpen && S.settingsModal.status === e) {
+                S.settingsModal.status = "";
+                const statusElement = document.getElementById('import-export-status');
+                if (statusElement) {
+                    statusElement.classList.add('hidden');
+                }
+            }
         }, 3e3)
     };
     try {
@@ -3137,47 +3451,7 @@ async function processCsvData(content) {
         throw e;
     }
 }
-async function importCollectionAndCacheFromZip(file) {
-    S.settingsModal.status = "Чтение ZIP архива...", S.settingsModal.statusType = "info", renderSettingsModal();
-    try {
-        const zip = await JSZip.loadAsync(file);
-        const csvFile = zip.file("collection.csv");
-        if (csvFile) {
-            S.settingsModal.status = "Импорт коллекции из CSV...", renderSettingsModal();
-            const csvContent = await csvFile.async("string");
-            await processCsvData(csvContent);
-        }
-        // No image cache import - we only import collections and favorites
 
-        S.settingsModal.status = "Импорт завершен. Перезагрузка данных из CSV...", S.settingsModal.statusType = "success", renderSettingsModal();
-        
-        // Reload all data from CSV after import to ensure consistency
-        try {
-            await loadDataFromCSV();
-            S.settingsModal.status = "Данные из CSV перезагружены. Обновление коллекции...", S.settingsModal.statusType = "success", renderSettingsModal();
-            
-            // Update collection data if needed
-            await Promise.all([
-                fetchMissingCollectionPartDetails(),
-                fetchMissingCollectionSetDetails(),
-                fetchMissingCollectionMinifigDetails()
-            ]);
-            await ensureBasicPartImagesForCollection();
-            await fetchColorDetailsForCollectionParts();
-            
-            S.settingsModal.status = "Импорт и обновление завершены!", S.settingsModal.statusType = "success";
-            S.gridStale = true;
-            updateUI();
-        } catch (error) {
-            console.error('Failed to reload CSV data after import:', error);
-            S.settingsModal.status = `Импорт завершен, но не удалось перезагрузить CSV данные: ${error.message}`, S.settingsModal.statusType = "warning";
-        }
-    } catch (e) {
-        console.error("ZIP Import failed:", e);
-        S.settingsModal.status = `Ошибка импорта ZIP: ${e.message}`, S.settingsModal.statusType = "error";
-        renderSettingsModal();
-    }
-}
 async function handleUpdateCollection(e, t, o) {
     S.coll[e] || (S.coll[e] = {});
     o > 0 ? S.coll[e][t] = o : (delete S.coll[e][t], 0 === Object.keys(S.coll[e]).length && delete S.coll[e]), o > 0 && !PART_MAP[e]?.colorImages && await fetchColorDetailsForPart(e), saveState(), forceSaveState(), S.gridStale = !0, "collection" === S.view ? updateUI() : (renderSidebar(), mainEl.querySelector(`.part-card[data-part-id="${e}"]`)?.prepend(function() {
@@ -3370,6 +3644,8 @@ async function handleBulkAddMinifigPartsFromModal(e) {
 }
 
 function triggerSearch(e = !1) {
+    console.log('triggerSearch called with:', { e, S_q: S.q, S_subView: S.subView, S_view: S.view });
+    
     if (!e) {
         if ("sets" === S.subView) {
             S.sortBy = S.q ? "relevance" : "year_desc";
@@ -3399,6 +3675,7 @@ function triggerSearch(e = !1) {
         fetchMinifigs();
     } else {
         S.selCatId = null;
+        console.log('Calling searchRebrickableParts with:', S.q.trim());
         searchRebrickableParts(S.q.trim());
     }
 }
@@ -3500,7 +3777,7 @@ function openModalForPart(e, t, o) {
             groupId: t,
             variants: o,
             selColorId: null,
-            qty: 1,
+            qty: 0,
             loadingColors: !1,
             loadingImg: !1,
             imgUrl: l.rebrickable_img_url || null
@@ -3513,7 +3790,7 @@ function openModalForPart(e, t, o) {
         if (l.availableColorIds) {
             if (l.availableColorIds.length > 0) {
                 S.partModal.selColorId = sortColorIds(l.availableColorIds, l.id)[0];
-                S.partModal.qty = S.coll[e]?.[S.partModal.selColorId] || 1;
+                S.partModal.qty = S.coll[e]?.[S.partModal.selColorId] || 0;
                 updateModalPartially({
                     controls: !0
                 });
@@ -3533,7 +3810,7 @@ function openModalForSet(e) {
             inv: [],
             invPage: 1,
             hasNextInv: !1,
-            qty: S.setColl[e]?.qty || 1,
+            qty: S.setColl[e]?.qty || 0,
             bulkUpdate: !1,
             status: "",
             statusType: "",
@@ -3556,7 +3833,7 @@ function openModalForMinifig(e) {
         S.selFigNum = e;
         S.minifigModal = {
             loading: !1,
-            qty: S.minifigColl[e]?.qty || 1,
+            qty: S.minifigColl[e]?.qty || 0,
             view: 'details',
             inv: null,
             loadingInv: !1,
@@ -3618,8 +3895,9 @@ document.addEventListener("click", async e => {
         top: 0,
         behavior: "smooth"
     });
-    if (t.closest("#sidebar-toggle")) return S.sidebarOpen = !0, void updateUI();
-    if (t.closest("#sidebar-close") || "sidebar-backdrop" === t.id) return S.sidebarOpen = !1, void updateUI();
+    if (t.closest("#sidebar-toggle")) return S.sidebarOpen = !S.sidebarOpen, void updateUI();
+    if (t.closest("#sidebar-close")) return S.sidebarOpen = !1, void updateUI();
+    if ("sidebar-backdrop" === t.id) return S.sidebarOpen = !1, void updateUI();
     const i = t.closest("[data-view]");
     if (i?.dataset.view) {
         const e = i.dataset.view;
@@ -3734,7 +4012,7 @@ document.addEventListener("click", async e => {
         openModalForPart(e, t, l);
         if ("collection" === S.view && m.dataset.colorId) {
             S.partModal.selColorId = m.dataset.colorId;
-            S.partModal.qty = S.coll[e]?.[S.partModal.selColorId] || 1;
+            S.partModal.qty = S.coll[e]?.[S.partModal.selColorId] || 0;
             updateModalPartially({
                 controls: !0
             });
@@ -3755,6 +4033,11 @@ document.addEventListener("click", async e => {
     }
     if (t.closest("#filter-button")) {
         S.filterOpen = !0;
+        // Ensure filters are properly initialized
+        if (!S.filters) S.filters = { colorIds: [], inCollectionOnly: false };
+        if (!S.setFilters) S.setFilters = { minYear: "", maxYear: "", minParts: "", maxParts: "" };
+        if (!S.sortBy) S.sortBy = 'popularity';
+        
         tempFilters = {
             filters: JSON.parse(JSON.stringify(S.filters)),
             setFilters: JSON.parse(JSON.stringify(S.setFilters)),
@@ -3824,6 +4107,9 @@ document.addEventListener("click", async e => {
             case "delete-all-minifigs":
                 S.settingsModal.delConfirm = "minifigs", renderSettingsModal();
                 break;
+            case "delete-all-data":
+                S.settingsModal.delConfirm = "all", renderSettingsModal();
+                break;
             case "cancel-delete":
                 S.settingsModal.delConfirm = null, renderSettingsModal();
                 break;
@@ -3836,38 +4122,38 @@ document.addEventListener("click", async e => {
             case "confirm-delete-minifigs":
                 S.minifigColl = {}, saveState(), S.settingsModal.delConfirm = null, renderSettingsModal(), updateUI();
                 break;
+            case "confirm-delete-all":
+                S.coll = {}, S.setColl = {}, S.minifigColl = {}, saveState(), S.settingsModal.delConfirm = null, renderSettingsModal(), updateUI();
+                break;
             case "refresh-minifig-data":
-                S.settingsModal.status = "Обновление данных минифигурок...", S.settingsModal.statusType = "info", renderSettingsModal();
+                updateSettingsModalStatus("Обновление данных минифигурок...", "info");
                 try {
                     await refreshMinifigData();
-                    S.settingsModal.status = "Данные минифигурок обновлены успешно!", S.settingsModal.statusType = "success";
+                    updateSettingsModalStatus("Данные минифигурок обновлены успешно!", "success");
                 } catch (error) {
-                    S.settingsModal.status = `Ошибка обновления: ${error.message}`, S.settingsModal.statusType = "error";
+                    updateSettingsModalStatus(`Ошибка обновления: ${error.message}`, "error");
                 }
-                renderSettingsModal();
                 break;
             case "reload-csv-data":
-                S.settingsModal.status = "Перезагрузка данных из CSV...", S.settingsModal.statusType = "info", renderSettingsModal();
+                updateSettingsModalStatus("Перезагрузка данных из CSV...", "info");
                 try {
                     await loadDataFromCSV();
-                    S.settingsModal.status = "Данные из CSV перезагружены успешно!", S.settingsModal.statusType = "success";
+                    updateSettingsModalStatus("Данные из CSV перезагружены успешно!", "success");
                 } catch (error) {
-                    S.settingsModal.status = `Ошибка перезагрузки CSV: ${error.message}`, S.settingsModal.statusType = "error";
+                    updateSettingsModalStatus(`Ошибка перезагрузки CSV: ${error.message}`, "error");
                 }
-                renderSettingsModal();
                 break;
             case "load-missing-api-data":
-                S.settingsModal.status = "Загрузка недостающих данных из API...", S.settingsModal.statusType = "info", renderSettingsModal();
+                updateSettingsModalStatus("Загрузка недостающих данных из API...", "info");
                 try {
                     await loadMissingDataFromAPI();
-                    S.settingsModal.status = "Недостающие данные загружены успешно!", S.settingsModal.statusType = "success";
+                    updateSettingsModalStatus("Недостающие данные загружены успешно!", "success");
                 } catch (error) {
-                    S.settingsModal.status = `Ошибка загрузки API данных: ${error.message}`, S.settingsModal.statusType = "error";
+                    updateSettingsModalStatus(`Ошибка загрузки API данных: ${error.message}`, "error");
                 }
-                renderSettingsModal();
                 break;
             case "force-reload-csv":
-                S.settingsModal.status = "Принудительная перезагрузка CSV данных...", S.settingsModal.statusType = "info", renderSettingsModal();
+                updateSettingsModalStatus("Принудительная перезагрузка CSV данных...", "info");
                 try {
                     // Clear all data maps first
                     Object.keys(PART_MAP).forEach(key => delete PART_MAP[key]);
@@ -3879,25 +4165,23 @@ document.addEventListener("click", async e => {
                     
                     // Reload from CSV
                     await loadDataFromCSV();
-                    S.settingsModal.status = "CSV данные принудительно перезагружены!", S.settingsModal.statusType = "success";
+                    updateSettingsModalStatus("CSV данные принудительно перезагружены!", "success");
                 } catch (error) {
-                    S.settingsModal.status = `Ошибка принудительной перезагрузки: ${error.message}`, S.settingsModal.statusType = "error";
+                    updateSettingsModalStatus(`Ошибка принудительной перезагрузки: ${error.message}`, "error");
                 }
-                renderSettingsModal();
                 break;
             case "clear-app-cache":
-                S.settingsModal.status = "Очистка кэша приложения...", S.settingsModal.statusType = "info", renderSettingsModal();
+                updateSettingsModalStatus("Очистка кэша приложения...", "info");
                 try {
                     const success = await window.clearAppCache();
                     if (success) {
-                        S.settingsModal.status = "Кэш приложения очищен успешно!", S.settingsModal.statusType = "success";
+                        updateSettingsModalStatus("Кэш приложения очищен успешно!", "success");
                     } else {
-                        S.settingsModal.status = "Ошибка очистки кэша", S.settingsModal.statusType = "error";
+                        updateSettingsModalStatus("Ошибка очистки кэша", "error");
                     }
                 } catch (error) {
-                    S.settingsModal.status = `Ошибка очистки кэша: ${error.message}`, S.settingsModal.statusType = "error";
+                    updateSettingsModalStatus(`Ошибка очистки кэша: ${error.message}`, "error");
                 }
-                renderSettingsModal();
                 break;
             case "get-cache-info":
                 try {
@@ -3920,12 +4204,7 @@ document.addEventListener("click", async e => {
                     console.error('Failed to get cache info:', error);
                 }
                 break;
-            case "export-zip":
-                exportCollectionAndCacheToZip();
-                break;
-            case "import-zip":
-                document.getElementById("import-zip-input")?.click();
-                break;
+
             case "import-csv":
                 document.getElementById("import-csv-input")?.click();
                 break;
@@ -3938,7 +4217,7 @@ document.addEventListener("click", async e => {
         if (!e) return;
         switch (e.dataset.action) {
             case "decrease-minifig-qty":
-                S.minifigModal.qty > 1 && (S.minifigModal.qty--, renderMinifigModal(!1));
+                S.minifigModal.qty > 0 && (S.minifigModal.qty--, renderMinifigModal(!1));
                 break;
             case "increase-minifig-qty":
                 S.minifigModal.qty++, renderMinifigModal(!1);
@@ -3949,7 +4228,7 @@ document.addEventListener("click", async e => {
             case "delete-from-minifig-collection-modal":
                 if (S.selFigNum) {
                     await handleUpdateMinifigCollection(S.selFigNum, 0);
-                    S.minifigModal.qty = 1;
+                    S.minifigModal.qty = 0;
                 }
                 break;
             case "toggle-minifig-modal-view":
@@ -4001,7 +4280,7 @@ document.addEventListener("click", async e => {
                 S.selSetNum && fetchSetInventory(S.selSetNum, S.setModal.invPage + 1);
                 break;
             case "decrease-set-qty":
-                S.setModal.qty > 1 && (S.setModal.qty--, updateSetModalControlsState());
+                S.setModal.qty > 0 && (S.setModal.qty--, updateSetModalControlsState());
                 break;
             case "increase-set-qty":
                 S.setModal.qty++, updateSetModalControlsState();
@@ -4010,7 +4289,7 @@ document.addEventListener("click", async e => {
                 S.selSetNum && handleUpdateSetCollection(S.selSetNum, S.setModal.qty);
                 break;
             case "delete-from-set-collection-modal":
-                S.selSetNum && (handleUpdateSetCollection(S.selSetNum, 0), S.setModal.qty = 1);
+                S.selSetNum && (handleUpdateSetCollection(S.selSetNum, 0), S.setModal.qty = 0);
                 break;
             case "go-to-theme":
                 l && (closeSetModal(), S.view = "catalog", S.subView = "sets", S.selThemeId = parseInt(l, 10), fetchSets());
@@ -4061,7 +4340,8 @@ document.addEventListener("click", async e => {
         if (!e) return;
         const {
             action: o,
-            colorId: l
+            colorId: l,
+            filterKey: filterKey
         } = e.dataset;
         switch (o) {
             case "modal-set-color":
@@ -4075,6 +4355,17 @@ document.addEventListener("click", async e => {
                     }
                 }
                 updateFilterModalUI();
+                break;
+            case "modal-set-filter":
+                if (filterKey && e.value !== undefined) {
+                    tempFilters.setFilters[filterKey] = e.value;
+                }
+                break;
+            case "modal-toggle-collection":
+                tempFilters.filters.inCollectionOnly = e.checked;
+                break;
+            case "modal-set-sort":
+                tempFilters.sortBy = e.value;
                 break;
             case "modal-reset-filters":
                 if ("sets" === S.subView) {
@@ -4105,6 +4396,90 @@ document.addEventListener("click", async e => {
                 break;
         }
     } else if (partModalEl?.contains(t)) {
+        // Handle custom variation selector button click
+        if (t.id === "variation-select-button") {
+            // Toggle dropdown
+            const dropdown = document.getElementById("variation-dropdown");
+            const isOpen = dropdown.style.display !== 'none';
+            
+            if (!isOpen) {
+                dropdown.style.display = 'block';
+                t.classList.add('open');
+            } else {
+                dropdown.style.display = 'none';
+                t.classList.remove('open');
+            }
+            return;
+        }
+        
+        // Handle variation option selection
+        if (t.classList.contains("variation-option")) {
+            const selectedVariationId = t.dataset.value;
+            const selectedVariation = S.partModal.variants?.find(v => v.id === selectedVariationId);
+            
+            if (selectedVariation && selectedVariation.id !== S.selPartId) {
+                // Update selected part ID to the new variation
+                S.selPartId = selectedVariationId;
+                
+                // Update button text
+                const buttonText = document.getElementById("variation-select-text");
+                if (buttonText) {
+                    buttonText.textContent = selectedVariation.name;
+                }
+                
+                // Update option styling
+                const dropdown = document.getElementById("variation-dropdown");
+                if (dropdown) {
+                    dropdown.querySelectorAll('.variation-option').forEach(opt => {
+                        opt.classList.remove('selected');
+                    });
+                    t.classList.add('selected');
+                }
+                
+                // Close dropdown
+                const button = document.getElementById("variation-select-button");
+                if (button) {
+                    button.classList.remove('open');
+                }
+                if (dropdown) {
+                    dropdown.style.display = 'none';
+                }
+                
+                // Update part modal data for the new variation
+                const newPart = PART_MAP[selectedVariationId];
+                if (newPart) {
+                    S.partModal.imgUrl = newPart.rebrickable_img_url || null;
+                    S.partModal.selColorId = null;
+                    S.partModal.qty = 0;
+                    
+                    // Update image
+                    updateModalPartially({
+                        image: true
+                    });
+                    
+                    // Update modal title to show selected variation name
+                    const modalTitle = document.querySelector('#modal-content h2');
+                    if (modalTitle) {
+                        modalTitle.textContent = selectedVariation.name;
+                    }
+                    
+                    // Fetch colors for the new variation
+                    if (newPart.availableColorIds && newPart.availableColorIds.length > 0) {
+                        S.partModal.selColorId = sortColorIds(newPart.availableColorIds, newPart.id)[0];
+                        S.partModal.qty = S.coll[selectedVariationId]?.[S.partModal.selColorId] || 0;
+                        updateModalPartially({
+                            colors: true,
+                            controls: true
+                        });
+                        fetchPartColorSpecifics(newPart.id, S.partModal.selColorId);
+                    } else {
+                        fetchPartColors(newPart.id);
+                    }
+                }
+            }
+            return;
+        }
+        
         const e = t.closest("[data-action]");
         if (e) {
             const {
@@ -4113,7 +4488,7 @@ document.addEventListener("click", async e => {
             } = e.dataset;
             switch (t) {
                 case "decrease-qty":
-                    S.partModal.qty > 1 && (S.partModal.qty--, updateModalControlsState());
+                    S.partModal.qty > 0 && (S.partModal.qty--, updateModalControlsState());
                     break;
                 case "increase-qty":
                     S.partModal.qty++, updateModalControlsState();
@@ -4122,7 +4497,7 @@ document.addEventListener("click", async e => {
                     S.selPartId && S.partModal.selColorId && await handleUpdateCollection(S.selPartId, S.partModal.selColorId, S.partModal.qty);
                     break;
                 case "delete-from-collection-modal":
-                    S.selPartId && S.partModal.selColorId && (await handleUpdateCollection(S.selPartId, S.partModal.selColorId, 0), S.partModal.qty = 1);
+                    S.selPartId && S.partModal.selColorId && (await handleUpdateCollection(S.selPartId, S.partModal.selColorId, 0), S.partModal.qty = 0);
                     break;
                 case "go-to-category":
                     o && (closeModal(), S.view = "catalog", S.subView = "parts", S.selCatId = parseInt(o, 10), loadPartsForCategory(S.selCatId));
@@ -4134,11 +4509,31 @@ document.addEventListener("click", async e => {
         const o = t.closest("button[data-color-id]");
         if (o && o.dataset.colorId) {
             S.partModal.selColorId = o.dataset.colorId;
-            S.partModal.qty = S.coll[S.selPartId]?.[S.partModal.selColorId] || 1;
+            S.partModal.qty = S.coll[S.selPartId]?.[S.partModal.selColorId] || 0;
+            
+            // Update controls first
             updateModalPartially({
-                colors: !0,
                 controls: !0
             });
+            
+            // Update colors without full re-render to prevent jumping
+            const colorContainer = document.getElementById("color-selector-container");
+            if (colorContainer) {
+                // Only update the selected color button styling
+                const allColorButtons = colorContainer.querySelectorAll('button[data-color-id]');
+                allColorButtons.forEach(btn => {
+                    btn.classList.remove('border-blue-500', 'scale-110');
+                    btn.classList.add('border-gray-600');
+                });
+                
+                // Highlight selected color
+                const selectedButton = colorContainer.querySelector(`button[data-color-id="${S.partModal.selColorId}"]`);
+                if (selectedButton) {
+                    selectedButton.classList.remove('border-gray-600');
+                    selectedButton.classList.add('border-blue-500', 'scale-110');
+                }
+            }
+            
             fetchPartColorSpecifics(S.selPartId, S.partModal.selColorId);
         }
     }
@@ -4214,28 +4609,6 @@ async function initializeApp() {
 }
 document.addEventListener("DOMContentLoaded", () => {
     viewerCloseBtn.innerHTML = I_X("w-6 h-6");
-    const importInput = document.createElement('input');
-    importInput.type = 'file';
-    importInput.id = 'import-zip-input';
-    importInput.accept = '.zip';
-    importInput.style.display = 'none';
-    
-    // Add event listener for importing ZIP file
-    importInput.addEventListener('change', async (event) => {
-        const file = event.target.files[0];
-        if (file) {
-            try {
-                await importCollectionAndCacheFromZip(file);
-                // Clear input after successful import
-                event.target.value = '';
-            } catch (error) {
-                console.error('Import failed:', error);
-                // Clear input in case of error
-                event.target.value = '';
-            }
-        }
-    });
-    
     // Add event listener for importing CSV file
     const csvImportInput = document.getElementById('import-csv-input');
     if (csvImportInput) {
@@ -4259,7 +4632,6 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
     
-    document.body.appendChild(importInput);
     initializeApp();
 
     if ('serviceWorker' in navigator) {
@@ -4354,54 +4726,44 @@ async function loadDataFromCSV() {
     try {
         
         // Update loading status
-        S.settingsModal.status = "Загрузка данных из CSV...", S.settingsModal.statusType = "info";
-        if (S.settingsOpen) renderSettingsModal();
+        updateSettingsModalStatus("Загрузка данных из CSV...", "info");
         
         // Load categories FIRST (most important for navigation)
-        S.settingsModal.status = "Загрузка категорий...", S.settingsModal.statusType = "info";
-        if (S.settingsOpen) renderSettingsModal();
+        updateSettingsModalStatus("Загрузка категорий...", "info");
         await loadCategoriesFromCSV();
         
         // Load themes (for sets navigation)
-        S.settingsModal.status = "Загрузка тем...", S.settingsModal.statusType = "info";
-        if (S.settingsOpen) renderSettingsModal();
+        updateSettingsModalStatus("Загрузка тем...", "info");
         await loadThemesFromCSV();
         
         // Load colors (needed for parts display)
-        S.settingsModal.status = "Загрузка цветов...", S.settingsModal.statusType = "info";
-        if (S.settingsOpen) renderSettingsModal();
+        updateSettingsModalStatus("Загрузка цветов...", "info");
         await loadColorsFromCSV();
         
         // Load parts (main catalog data)
-        S.settingsModal.status = "Загрузка деталей...", S.settingsModal.statusType = "info";
-        if (S.settingsOpen) renderSettingsModal();
+        updateSettingsModalStatus("Загрузка деталей...", "info");
         await loadPartsFromCSV();
         
         // Load sets (main catalog data)
-        S.settingsModal.status = "Загрузка наборов...", S.settingsModal.statusType = "info";
-        if (S.settingsOpen) renderSettingsModal();
+        updateSettingsModalStatus("Загрузка наборов...", "info");
         await loadSetsFromCSV();
         
         // Load minifigs (main catalog data)
-        S.settingsModal.status = "Загрузка минифигурок...", S.settingsModal.statusType = "info";
-        if (S.settingsOpen) renderSettingsModal();
+        updateSettingsModalStatus("Загрузка минифигурок...", "info");
         await loadMinifigsFromCSV();
         
         // Load elements (part-color combinations)
-        S.settingsModal.status = "Загрузка элементов...", S.settingsModal.statusType = "info";
-        if (S.settingsOpen) renderSettingsModal();
+        updateSettingsModalStatus("Загрузка элементов...", "info");
         await loadElementsFromCSV();
         
         // Load inventories and their contents
-        S.settingsModal.status = "Загрузка инвентарей...", S.settingsModal.statusType = "info";
-        if (S.settingsOpen) renderSettingsModal();
+        updateSettingsModalStatus("Загрузка инвентарей...", "info");
         await loadInventoriesFromCSV();
         
         const stats = getLoadingStats();
         
         // Update loading status
-        S.settingsModal.status = "Данные из CSV загружены успешно!", S.settingsModal.statusType = "success";
-        if (S.settingsOpen) renderSettingsModal();
+        updateSettingsModalStatus("Данные из CSV загружены успешно!", "success");
         
         // Save state after CSV loading
         saveState();
@@ -4440,9 +4802,9 @@ async function loadColorsFromCSV() {
                         id: id,
                         name: name,
                         hex: `#${rgb || '000000'}`,
-                        isTransparent: is_trans === 't',
+                        isTransparent: is_trans === 'True',
                         rgb: rgb || '000000',
-                        is_trans: is_trans === 't'
+                        is_trans: is_trans === 'True'
                     };
                 }
             }
@@ -4907,7 +5269,65 @@ function getLoadingStats() {
         minifigsWithImages: Object.values(MINIFIG_MAP).filter(m => m.minifig_img_url).length
     };
     
-    return stats;
+    // Get API loading statistics
+    const apiStats = getApiLoadingStats();
+    
+    return {
+        ...stats,
+        ...apiStats
+    };
+}
+
+// Function to get API loading statistics
+function getApiLoadingStats() {
+    const apiStats = JSON.parse(localStorage.getItem('legoApiStats') || '{}');
+    
+    return {
+        apiColors: apiStats.colors || 0,
+        apiParts: apiStats.parts || 0,
+        apiSets: apiStats.sets || 0,
+        apiMinifigs: apiStats.minifigs || 0,
+        apiImages: apiStats.images || 0,
+        lastApiUpdate: apiStats.lastUpdate || null
+    };
+}
+
+// Function to update API loading statistics
+function updateApiLoadingStats(type, count = 1) {
+    try {
+        const apiStats = JSON.parse(localStorage.getItem('legoApiStats') || '{}');
+        
+        if (!apiStats[type]) {
+            apiStats[type] = 0;
+        }
+        
+        apiStats[type] += count;
+        apiStats.lastUpdate = new Date().toISOString();
+        
+        localStorage.setItem('legoApiStats', JSON.stringify(apiStats));
+    } catch (error) {
+        console.error('Failed to update API stats:', error);
+    }
+}
+
+// Function to update settings modal status without full re-render
+function updateSettingsModalStatus(status, statusType = 'info') {
+    if (!S.settingsOpen || !S.settingsModal) return;
+    
+    S.settingsModal.status = status;
+    S.settingsModal.statusType = statusType;
+    
+    // Update only the status element without full re-render
+    const statusElement = document.getElementById('import-export-status');
+    if (statusElement) {
+        const statusClass = statusType === 'error' ? 'bg-red-900/50 text-red-300' : 
+                           statusType === 'success' ? 'bg-green-900/50 text-green-300' : 
+                           'bg-blue-900/50 text-blue-300';
+        
+        statusElement.className = `mb-2 p-2 text-sm rounded-md ${statusClass}`;
+        statusElement.textContent = status;
+        statusElement.classList.remove('hidden');
+    }
 }
 
 // Function to search in CSV data instead of API
@@ -4916,6 +5336,9 @@ function searchInCSVData(query, type = 'parts') {
     
     const searchTerm = query.toLowerCase().trim();
     const results = [];
+    
+    console.log('searchInCSVData called with:', { query, type, searchTerm });
+    console.log('PART_MAP keys:', Object.keys(PART_MAP).slice(0, 5));
     
     switch (type) {
         case 'parts':
@@ -4989,6 +5412,8 @@ function calculateSearchScore(item, searchTerm) {
     if (item.name && item.name.toLowerCase().includes(searchTerm)) score += 25;
     if (item.id && item.id.toLowerCase().includes(searchTerm)) score += 25;
     if (item.set_num && item.set_num.toLowerCase().includes(searchTerm)) score += 25;
+    
+
     
     return score;
 }
@@ -5069,8 +5494,7 @@ async function loadMissingDataFromAPI() {
         }
         
         // Update loading status
-        S.settingsModal.status = "Загрузка недостающих данных из API...", S.settingsModal.statusType = "info";
-        if (S.settingsOpen) renderSettingsModal();
+        updateSettingsModalStatus("Загрузка недостающих данных из API...", "info");
         
         // Since we now generate all image URLs from CSV, this function is mainly for future use
         // when new data might be available that's not in our CSV files
@@ -5078,8 +5502,7 @@ async function loadMissingDataFromAPI() {
         const stats = getLoadingStats();
         
         // Update loading status
-        S.settingsModal.status = "Все данные доступны из CSV!", S.settingsModal.statusType = "success";
-        if (S.settingsOpen) renderSettingsModal();
+        updateSettingsModalStatus("Все данные доступны из CSV!", "success");
         
         // Save state after API loading
         saveState();
@@ -5098,11 +5521,13 @@ async function refreshMinifigData() {
             return;
         }
         
+        updateSettingsModalStatus("Обновление данных минифигурок...", "info");
         await fetchMissingCollectionMinifigDetails();
         
         // Update UI after refresh
         S.gridStale = true;
         updateUI();
+        updateSettingsModalStatus("Данные минифигурок обновлены!", "success");
     } catch (error) {
         console.error('Failed to refresh minifig data:', error);
     }
@@ -5326,9 +5751,15 @@ async function fetchMissingCollectionMinifigDetails() {
     for (let i = 0; i < allFigNums.length; i += batchSize) {
         const batch = allFigNums.slice(i, i + batchSize);
         try {
-            await Promise.all(batch.map(figNum => fetchMinifigDetailsWithRetry(figNum)));
+            const results = await Promise.all(batch.map(figNum => fetchMinifigDetailsWithRetry(figNum)));
             // Save state after each batch to avoid data loss
             saveState();
+            
+            // Update API loading statistics for minifigs
+            const successfulFetches = results.filter(result => result !== undefined).length;
+            if (successfulFetches > 0) {
+                updateApiLoadingStats('minifigs', successfulFetches);
+            }
         } catch (error) {
             console.error(`Failed to fetch batch ${i}-${i + batchSize}:`, error);
         }
@@ -5336,8 +5767,26 @@ async function fetchMissingCollectionMinifigDetails() {
         if (i + batchSize < allFigNums.length) {
             await new Promise(resolve => setTimeout(resolve, 1000));
         }
+            }
     }
-}
+    
+    // Initialize API loading statistics if not exists
+    function initializeApiStats() {
+        if (!localStorage.getItem('legoApiStats')) {
+            const initialStats = {
+                colors: 0,
+                parts: 0,
+                sets: 0,
+                minifigs: 0,
+                images: 0,
+                lastUpdate: null
+            };
+            localStorage.setItem('legoApiStats', JSON.stringify(initialStats));
+        }
+    }
+    
+    // Call initialization when app starts
+    initializeApiStats();
   </script>
 </body>
 </html>
