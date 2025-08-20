@@ -144,6 +144,26 @@
             font-size: 16px; /* Предотвращает зум на iOS */
         }
     }
+    
+    /* Loading indicator styles */
+    #loading-container {
+        transition: opacity 0.5s ease-out;
+    }
+    
+    #loading-container.hidden {
+        opacity: 0;
+        pointer-events: none;
+    }
+    
+    .loading-step {
+        opacity: 0;
+        animation: fadeInUp 0.3s ease-out forwards;
+    }
+    
+    .loading-step:nth-child(1) { animation-delay: 0.1s; }
+    .loading-step:nth-child(2) { animation-delay: 0.2s; }
+    .loading-step:nth-child(3) { animation-delay: 0.3s; }
+    .loading-step:nth-child(4) { animation-delay: 0.4s; }
   </style>
 </head>
 <body class="bg-gray-900 text-gray-200">
@@ -151,7 +171,20 @@
   <div id="sidebar-backdrop" class="fixed inset-0 bg-black bg-opacity-60 z-30 hidden lg:hidden"></div>
   <div class="lg:ml-80 flex flex-col h-screen">
     <header id="header-container" class="bg-gray-800/50 backdrop-blur-sm sticky top-0 z-20 p-4 border-b border-gray-700"></header>
-    <main id="main-content" class="flex-1 overflow-y-auto no-scrollbar"></main>
+    <main id="main-content" class="flex-1 overflow-y-auto no-scrollbar">
+      <!-- Loading indicator -->
+      <div id="loading-container" class="flex flex-col items-center justify-center h-full p-8">
+        <div class="text-center">
+          <div class="loader mx-auto mb-4"></div>
+          <h2 class="text-2xl font-bold text-gray-200 mb-2">Загрузка каталога LEGO</h2>
+          <p id="loading-status" class="text-gray-400 mb-4">Подготовка к загрузке...</p>
+          <div class="w-64 bg-gray-700 rounded-full h-2 mb-4">
+            <div id="loading-progress" class="bg-blue-500 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+          </div>
+          <div id="loading-details" class="text-sm text-gray-500"></div>
+        </div>
+      </div>
+    </main>
   </div>
   <div id="modal-container" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 backdrop-blur-sm modal-hidden"></div>
   <div id="set-modal-container" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 backdrop-blur-sm modal-hidden"></div>
@@ -572,17 +605,42 @@ async function fetchAllColors() {
     }
 }
 async function loadPartsForCategory(e) {
+    // Show loading indicator for category loading
+    updateLoadingStatus("Загрузка деталей категории...", 65, "Загрузка данных из CSV");
+    
     if (S.selCatId = e, S.loading = !0, S.err = null, S.searchGroups = null, S.q = '', S.catGroups = null, S.toDisplay = S.increment, S.gridStale = !0, updateUI(), S.filters.colorIds?.length > 1) return S.catGroups = {}, S.loading = !1, void updateUI();
     try {
-        let t = `/parts/?part_cat_id=${e}`;
-        S.filters.colorIds?.length === 1 && (t += `&color_id=${S.filters.colorIds[0]}`);
-        const o = (await apiFetchPaginated(t)).map(procPart).filter(Boolean);
+        // Load parts from CSV data instead of API
+        let o = Object.values(PART_MAP).filter(part => part.categoryId === e);
+        
+        // Apply color filter if specified
+        if (S.filters.colorIds?.length === 1) {
+            o = o.filter(part => {
+                // Check if part has this color in inventory data
+                if (window.INVENTORY_DATA && window.INVENTORY_DATA.parts) {
+                    return Object.values(window.INVENTORY_DATA.parts).some(inventory => 
+                        inventory.some(item => item.part_num === part.id && item.color_id === S.filters.colorIds[0])
+                    );
+                }
+                return true; // If no inventory data, show all parts
+            });
+        }
+        
         let l = o;
-        S.filters.inCollectionOnly && (l = o.filter(e => S.coll[e.id] && Object.keys(S.coll[e.id]).length > 0)), S.catGroups = groupParts(l)
+        S.filters.inCollectionOnly && (l = o.filter(e => S.coll[e.id] && Object.keys(S.coll[e.id]).length > 0));
+        S.catGroups = groupParts(l);
     } catch (t) {
-        console.error("Rebrickable parts fetch failed:", t), S.err = t.message
+        console.error("CSV parts fetch failed:", t), S.err = t.message
     } finally {
-        S.loading = !1, updateUI()
+        S.loading = !1;
+        
+        // Hide loading indicator after category loading
+        updateLoadingStatus("Детали категории загружены", 100, `Загружено ${Object.keys(S.catGroups || {}).length} групп деталей`);
+        setTimeout(() => {
+            hideLoadingIndicator();
+        }, 1000);
+        
+        updateUI();
     }
 }
 
@@ -657,10 +715,29 @@ async function searchRebrickableParts(e) {
     } catch (t) {
         console.error("CSV search failed:", t), S.err = t.message, S.searchGroups = {}
     } finally {
-        S.loading = !1, updateUI()
+        S.loading = !1;
+        
+        // Hide loading indicator after search completion
+        if (S.q && S.q.trim().length > 0) {
+            updateLoadingStatus("Поиск завершен", 100, `Найдено ${Object.keys(S.searchGroups || {}).length} групп деталей`);
+            setTimeout(() => {
+                hideLoadingIndicator();
+            }, 1000);
+        }
+        
+        updateUI();
     }
 }
 async function fetchSets() {
+    // Show loading indicator for sets loading
+    if (S.selThemeId) {
+        updateLoadingStatus("Загрузка наборов темы...", 65, "Загрузка данных из CSV");
+    } else if (S.q) {
+        updateLoadingStatus("Поиск наборов...", 70, `Поиск по запросу: "${S.q}"`);
+    } else {
+        updateLoadingStatus("Загрузка всех наборов...", 65, "Загрузка данных из CSV");
+    }
+    
     S.loading = !0, S.err = null, S.setRes = null, S.searchSetRes = null, S.toDisplay = S.increment, S.gridStale = !0, updateUI();
     try {
         let results = [];
@@ -717,10 +794,27 @@ async function fetchSets() {
     } catch (e) {
         console.error("Ошибка загрузки наборов из CSV:", e), S.err = e.message
     } finally {
-        S.loading = !1, updateUI()
+        S.loading = !1;
+        
+        // Hide loading indicator after sets loading
+        if (S.subView === 'sets') {
+            updateLoadingStatus("Наборы загружены", 100, `Загружено ${results.length} наборов`);
+            setTimeout(() => {
+                hideLoadingIndicator();
+            }, 1000);
+        }
+        
+        updateUI();
     }
 }
 async function fetchMinifigs() {
+    // Show loading indicator for minifigs loading
+    if (S.q) {
+        updateLoadingStatus("Поиск минифигурок...", 70, `Поиск по запросу: "${S.q}"`);
+    } else {
+        updateLoadingStatus("Загрузка всех минифигурок...", 65, "Загрузка данных из CSV");
+    }
+    
     S.loading = !0, S.err = null, S.toDisplay = S.increment, S.gridStale = !0, updateUI();
     try {
         let results = [];
@@ -752,10 +846,23 @@ async function fetchMinifigs() {
     } catch (e) {
         console.error("Ошибка загрузки минифигурок из CSV:", e), S.err = e.message
     } finally {
-        S.loading = !1, updateUI()
+        S.loading = !1;
+        
+        // Hide loading indicator after minifigs loading
+        if (S.subView === 'minifigs') {
+            updateLoadingStatus("Минифигурки загружены", 100, `Загружено ${results.length} минифигурок`);
+            setTimeout(() => {
+                hideLoadingIndicator();
+            }, 1000);
+        }
+        
+        updateUI();
     }
 }
 async function fetchPartColors(e) {
+    // Show loading indicator for colors loading
+    updateLoadingStatus("Загрузка цветов детали...", 75, "Загрузка доступных цветов");
+    
     S.partModal.loadingColors = !0, updateModalPartially({
         colors: !0
     });
@@ -770,7 +877,12 @@ async function fetchPartColors(e) {
     } catch (t) {
         console.error(`Failed to fetch colors for ${e}:`, t), PART_MAP[e] || (PART_MAP[e] = {}), PART_MAP[e].availableColorIds = PART_MAP[e].availableColorIds || []
     } finally {
-        S.partModal.loadingColors = !1, updateModalPartially({
+        S.partModal.loadingColors = !1;
+        
+        // Update loading status for colors
+        updateLoadingStatus("Цвета загружены", 80, `Доступно ${PART_MAP[e]?.availableColorIds?.length || 0} цветов`);
+        
+        updateModalPartially({
             colors: !0,
             controls: !0
         }), S.partModal.selColorId && fetchPartColorSpecifics(e, S.partModal.selColorId)
@@ -827,9 +939,18 @@ async function fetchPartColorSpecifics(e, t) {
         console.warn("Could not fetch color-specific image:", o);
         S.partModal.imgUrl = PART_MAP[e]?.rebrickable_img_url || null;
     } finally {
-        S.partModal.loadingImg = !1, updateModalPartially({
+        S.partModal.loadingImg = !1;
+        
+        // Show loading indicator for image loading
+        if (S.partModal.imgUrl) {
+            updateLoadingStatus("Изображение загружено", 85, "Изображение детали готово");
+        } else {
+            updateLoadingStatus("Изображение недоступно", 85, "Используется стандартное изображение");
+        }
+        
+        updateModalPartially({
             image: !0
-        })
+        });
     }
 }
 async function fetchColorDetailsForPart(e) {
@@ -1077,6 +1198,9 @@ async function fetchMinifigDetails(e) {
 }
 
 async function fetchSetInventory(e, t = 1) {
+    // Show loading indicator for set inventory
+    updateLoadingStatus("Загрузка инвентаря набора...", 75, "Загрузка списка деталей");
+    
     if (S.setModal.loading = !0, t === 1 && (S.setModal.inv = []), updateSetModalView(), !S.selSetNum) return;
     try {
         const o = `/sets/${e}/parts/?page=${t}&page_size=50`,
@@ -1112,7 +1236,12 @@ async function fetchSetInventory(e, t = 1) {
     } catch (o) {
         console.error(`Failed to fetch inventory for ${e}:`, o)
     } finally {
-        S.setModal.loading = !1, S.selSetNum && updateSetModalView()
+        S.setModal.loading = !1;
+        
+        // Update loading status for set inventory
+        updateLoadingStatus("Инвентарь набора загружен", 80, `Загружено ${S.setModal.inv.length} деталей`);
+        
+        S.selSetNum && updateSetModalView();
     }
 }
 async function fetchAllSetInventory(e) {
@@ -1161,6 +1290,9 @@ async function fetchAllSetInventory(e) {
     return t
 }
 async function fetchSetMinifigs(e) {
+    // Show loading indicator for set minifigs
+    updateLoadingStatus("Загрузка минифигурок набора...", 75, "Загрузка списка минифигурок");
+    
     S.setModal.loadingMinifigs = !0, updateSetModalView();
     try {
         const t = await apiFetchPaginated(`/sets/${e}/minifigs/`);
@@ -1185,6 +1317,9 @@ async function fetchSetMinifigs(e) {
     }
 }
 async function fetchMinifigParts(e) {
+    // Show loading indicator for minifig parts
+    updateLoadingStatus("Загрузка деталей минифигурки...", 75, "Загрузка списка деталей");
+    
     try {
         const t = await apiFetchPaginated(`/minifigs/${e}/parts/`);
         const result = (t || []).map(e => {
@@ -1207,6 +1342,9 @@ async function fetchMinifigParts(e) {
         
         // Fetch missing part images for minifig parts
         await fetchMissingMinifigPartImages(result);
+        
+        // Update loading status for minifig parts
+        updateLoadingStatus("Детали минифигурки загружены", 80, `Загружено ${result.length} деталей`);
         
         return result;
     } catch (t) {
@@ -3236,6 +3374,15 @@ function renderMinifigModalInventoryView() {
 }
 
 function updateUI() {
+    // Check if loading is still in progress
+    const loadingContainer = document.getElementById('loading-container');
+    if (loadingContainer && !loadingContainer.classList.contains('hidden')) {
+        // Still loading, don't render main content yet
+        renderSidebar();
+        renderHeader();
+        return;
+    }
+    
     renderSidebar(), renderHeader(), renderMainContent();
     
     // Setup search input event listener (only for updating S.q, not auto-search)
@@ -3646,6 +3793,11 @@ async function handleBulkAddMinifigPartsFromModal(e) {
 function triggerSearch(e = !1) {
     console.log('triggerSearch called with:', { e, S_q: S.q, S_subView: S.subView, S_view: S.view });
     
+    // Show loading indicator for search
+    if (S.q && S.q.trim().length > 0) {
+        updateLoadingStatus("Поиск...", 70, `Поиск по запросу: "${S.q}"`);
+    }
+    
     if (!e) {
         if ("sets" === S.subView) {
             S.sortBy = S.q ? "relevance" : "year_desc";
@@ -3902,12 +4054,30 @@ document.addEventListener("click", async e => {
     if (i?.dataset.view) {
         const e = i.dataset.view;
         if (S.view === e) return;
+        
+        // Show loading indicator when switching views
+        if (e === 'collection' && Object.keys(S.coll).length > 0) {
+            updateLoadingStatus("Переключение на коллекцию...", 50, "Загрузка данных коллекции");
+        } else if (e === 'catalog') {
+            updateLoadingStatus("Переключение на каталог...", 50, "Загрузка каталога");
+        }
+        
         return S.view = e, S.q = "", S.err = null, S.gridStale = !0, S.selCatId = null, S.selCollCatId = null, S.selThemeId = null, S.selCollThemeId = null, void("catalog" === S.view && "minifigs" === S.subView && !S.minifigRes ? fetchMinifigs() : (updateUI(), setupScrollListener()))
     }
     const n = t.closest("[data-sub-view]");
     if (n?.dataset.subView) {
         const e = n.dataset.subView;
         if (S.subView === e) return;
+        
+        // Show loading indicator when switching sub-views
+        if (e === 'minifigs') {
+            updateLoadingStatus("Переключение на минифигурки...", 60, "Загрузка данных минифигурок");
+        } else if (e === 'sets') {
+            updateLoadingStatus("Переключение на наборы...", 60, "Загрузка данных наборов");
+        } else if (e === 'parts') {
+            updateLoadingStatus("Переключение на детали...", 60, "Загрузка данных деталей");
+        }
+        
         S.subView = e;
         S.q = "";
         S.err = null;
@@ -4234,13 +4404,25 @@ document.addEventListener("click", async e => {
             case "toggle-minifig-modal-view":
                 S.minifigModal.view = "details" === S.minifigModal.view ? "inventory" : "details";
                 if ("inventory" === S.minifigModal.view && !S.minifigModal.inv) {
+                    // Show loading indicator for minifig inventory
+                    updateLoadingStatus("Загрузка инвентаря минифигурки...", 75, "Загрузка списка деталей");
+                    
                     S.minifigModal.loadingInv = !0, S.minifigModal.invError = !1, updateMinifigModalView();
                     try {
                         S.minifigModal.inv = await fetchMinifigParts(S.selFigNum)
                     } catch (t) {
                         S.minifigModal.invError = !0
                     } finally {
-                        S.minifigModal.loadingInv = !1, updateMinifigModalView()
+                        S.minifigModal.loadingInv = !1;
+                        
+                        // Update loading status for minifig inventory
+                        if (S.minifigModal.inv && S.minifigModal.inv.length > 0) {
+                            updateLoadingStatus("Инвентарь минифигурки загружен", 80, `Загружено ${S.minifigModal.inv.length} деталей`);
+                        } else {
+                            updateLoadingStatus("Инвентарь минифигурки пуст", 80, "Детали не найдены");
+                        }
+                        
+                        updateMinifigModalView();
                     }
                 } else updateMinifigModalView();
                 break;
@@ -4306,10 +4488,17 @@ document.addEventListener("click", async e => {
                     if (e) {
                         e.isExpanded = !e.isExpanded;
                         if (e.isExpanded && !e.parts && !e.loadingError) {
+                            // Show loading indicator for minifig parts in set modal
+                            updateLoadingStatus("Загрузка деталей минифигурки...", 75, "Загрузка списка деталей");
+                            
                             e.isLoadingParts = !0, renderSetModal(!1), fetchMinifigParts(a).then(t => {
-                                e.parts = t
+                                e.parts = t;
+                                
+                                // Update loading status for minifig parts
+                                updateLoadingStatus("Детали минифигурки загружены", 80, `Загружено ${t.length} деталей`);
                             }).catch(() => {
-                                e.loadingError = !0
+                                e.loadingError = !0;
+                                updateLoadingStatus("Ошибка загрузки деталей", 0, "Не удалось загрузить детали минифигурки");
                             }).finally(() => {
                                 e.isLoadingParts = !1, S.selSetNum && renderSetModal(!1)
                             })
@@ -4320,13 +4509,21 @@ document.addEventListener("click", async e => {
             case "retry-load-minifig-parts":
                 if (a) {
                     const e = S.setModal.minifigs.find(e => e.set_num === a);
-                    e && (e.loadingError = !1, e.isLoadingParts = !0, e.parts = null, renderSetModal(!1), fetchMinifigParts(a).then(t => {
-                        e.parts = t
-                    }).catch(() => {
-                        e.loadingError = !0
-                    }).finally(() => {
-                        e.isLoadingParts = !1, S.selSetNum && renderSetModal(!1)
-                    }))
+                    e && (e.loadingError = !1, e.isLoadingParts = !0, e.parts = null, renderSetModal(!1), 
+                        // Show loading indicator for retry loading minifig parts
+                        updateLoadingStatus("Повторная загрузка деталей минифигурки...", 75, "Загрузка списка деталей"),
+                        fetchMinifigParts(a).then(t => {
+                            e.parts = t;
+                            
+                            // Update loading status for minifig parts
+                            updateLoadingStatus("Детали минифигурки загружены", 80, `Загружено ${t.length} деталей`);
+                        }).catch(() => {
+                            e.loadingError = !0;
+                            updateLoadingStatus("Ошибка загрузки деталей", 0, "Не удалось загрузить детали минифигурки");
+                        }).finally(() => {
+                            e.isLoadingParts = !1, S.selSetNum && renderSetModal(!1)
+                        })
+                    )
                 }
                 break;
             case "add-minifig-to-collection":
@@ -4553,6 +4750,9 @@ document.addEventListener("click", async e => {
     e && toTopBtn.classList.contains("opacity-0") ? toTopBtn.classList.remove("opacity-0", "pointer-events-none", "translate-y-4") : !e && !toTopBtn.classList.contains("opacity-0") && toTopBtn.classList.add("opacity-0", "pointer-events-none", "translate-y-4")
 });
 async function initializeApp() {
+    // Show loading indicator immediately
+    updateLoadingStatus("Инициализация приложения...", 5, "Загрузка состояния и подготовка данных");
+    
     loadState();
     
     S.sidebarLoading = true;
@@ -4563,6 +4763,7 @@ async function initializeApp() {
         await loadDataFromCSV();
         
         // Check for new data from API in background (without overloading)
+        updateLoadingStatus("Проверка обновлений...", 95, "Проверка новых данных из API");
         checkForNewDataInBackground();
         
     } catch (e) {
@@ -4602,8 +4803,20 @@ async function initializeApp() {
             
             // Setup scroll listener for automatic image loading
             setupScrollListener();
+            
+            // Final loading completion
+            updateLoadingStatus("Загрузка завершена!", 100, "Приложение готово к использованию");
+            setTimeout(() => {
+                hideLoadingIndicator();
+            }, 1000);
+            
         } catch (e) {
             console.error("Background collection data fetch failed:", e);
+            // Hide loading indicator even on error
+            updateLoadingStatus("Загрузка завершена с предупреждениями", 100, "Приложение готово к использованию");
+            setTimeout(() => {
+                hideLoadingIndicator();
+            }, 1000);
         }
     })();
 }
@@ -4721,49 +4934,41 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 });
 
-// Function to load data from CSV files
+// Function to load data from CSV files with priority loading
 async function loadDataFromCSV() {
     try {
-        
-        // Update loading status
-        updateSettingsModalStatus("Загрузка данных из CSV...", "info");
+        // Phase 1: Critical data for sidebar navigation (load first)
+        updateLoadingStatus("Загрузка критических данных...", 10, "Подготовка к загрузке");
         
         // Load categories FIRST (most important for navigation)
-        updateSettingsModalStatus("Загрузка категорий...", "info");
+        updateLoadingStatus("Загрузка категорий деталей...", 20, "Категории необходимы для навигации");
         await loadCategoriesFromCSV();
         
         // Load themes (for sets navigation)
-        updateSettingsModalStatus("Загрузка тем...", "info");
+        updateLoadingStatus("Загрузка тем наборов...", 30, "Темы необходимы для навигации по наборам");
         await loadThemesFromCSV();
         
         // Load colors (needed for parts display)
-        updateSettingsModalStatus("Загрузка цветов...", "info");
+        updateLoadingStatus("Загрузка цветов...", 40, "Цвета необходимы для отображения деталей");
         await loadColorsFromCSV();
         
-        // Load parts (main catalog data)
-        updateSettingsModalStatus("Загрузка деталей...", "info");
-        await loadPartsFromCSV();
+        // Phase 2: Main catalog data (load in parallel for better performance)
+        updateLoadingStatus("Загрузка основного каталога...", 50, "Загрузка деталей, наборов и минифигурок");
         
-        // Load sets (main catalog data)
-        updateSettingsModalStatus("Загрузка наборов...", "info");
-        await loadSetsFromCSV();
+        // Load main data in parallel for better performance
+        const [partsResult, setsResult, minifigsResult] = await Promise.all([
+            loadPartsFromCSV(),
+            loadSetsFromCSV(),
+            loadMinifigsFromCSV()
+        ]);
         
-        // Load minifigs (main catalog data)
-        updateSettingsModalStatus("Загрузка минифигурок...", "info");
-        await loadMinifigsFromCSV();
+        updateLoadingStatus("Загрузка дополнительных данных...", 70, "Загрузка элементов и инвентарей");
         
-        // Load elements (part-color combinations)
-        updateSettingsModalStatus("Загрузка элементов...", "info");
+        // Phase 3: Additional data (load last)
         await loadElementsFromCSV();
-        
-        // Load inventories and their contents
-        updateSettingsModalStatus("Загрузка инвентарей...", "info");
         await loadInventoriesFromCSV();
         
-        const stats = getLoadingStats();
-        
-        // Update loading status
-        updateSettingsModalStatus("Данные из CSV загружены успешно!", "success");
+        updateLoadingStatus("Завершение загрузки...", 90, "Сохранение состояния и обновление интерфейса");
         
         // Save state after CSV loading
         saveState();
@@ -4772,16 +4977,30 @@ async function loadDataFromCSV() {
         S.gridStale = true;
         updateUI();
         
+        // Hide loading indicator
+        updateLoadingStatus("Загрузка завершена!", 100, "Каталог готов к использованию");
+        setTimeout(() => {
+            hideLoadingIndicator();
+        }, 1000);
+        
     } catch (error) {
         console.error('Failed to load CSV data:', error);
         S.err = `Ошибка загрузки CSV данных: ${error.message}`;
         
+        updateLoadingStatus("Ошибка загрузки", 0, `Ошибка: ${error.message}`);
+        
         // Fallback to API loading if CSV fails
         try {
+            updateLoadingStatus("Попытка загрузки из API...", 50, "Резервная загрузка");
             await Promise.all([fetchAllColors(), fetchCategories(), fetchThemes()]);
+            updateLoadingStatus("Загрузка из API завершена", 100, "Каталог готов к использованию");
+            setTimeout(() => {
+                hideLoadingIndicator();
+            }, 1000);
         } catch (apiError) {
             console.error('Fallback API loading also failed:', apiError);
             S.err = `${S.err}\nТакже не удалось загрузить данные из API: ${apiError.message}`;
+            updateLoadingStatus("Критическая ошибка", 0, "Не удалось загрузить данные ни из CSV, ни из API");
         }
     }
 }
@@ -5307,6 +5526,38 @@ function updateApiLoadingStats(type, count = 1) {
         localStorage.setItem('legoApiStats', JSON.stringify(apiStats));
     } catch (error) {
         console.error('Failed to update API stats:', error);
+    }
+}
+
+// Functions to manage loading indicator
+function updateLoadingStatus(status, progress = null, details = null) {
+    const statusElement = document.getElementById('loading-status');
+    const progressElement = document.getElementById('loading-progress');
+    const detailsElement = document.getElementById('loading-details');
+    
+    if (statusElement) {
+        statusElement.textContent = status;
+    }
+    
+    if (progressElement && progress !== null) {
+        progressElement.style.width = `${progress}%`;
+    }
+    
+    if (detailsElement && details !== null) {
+        detailsElement.textContent = details;
+    }
+}
+
+function hideLoadingIndicator() {
+    const loadingContainer = document.getElementById('loading-container');
+    if (loadingContainer) {
+        loadingContainer.classList.add('hidden');
+        // Remove the loading container after animation
+        setTimeout(() => {
+            if (loadingContainer.parentNode) {
+                loadingContainer.parentNode.removeChild(loadingContainer);
+            }
+        }, 500);
     }
 }
 
